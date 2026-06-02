@@ -15,7 +15,7 @@ export class DebugOverlay {
 
   constructor(eventBus: EventBus) {
     this.eventBus = eventBus
-    this.visible = false
+    this.visible = true
     this.maxEvents = 100
     this.selectedAgentId = undefined
     this.eventFilter = ''
@@ -53,7 +53,7 @@ export class DebugOverlay {
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 12px;
       overflow-y: auto;
-      transform: translateX(100%);
+      transform: translateX(0);
       transition: transform 0.3s ease;
       z-index: 1000;
       border-left: 2px solid #333;

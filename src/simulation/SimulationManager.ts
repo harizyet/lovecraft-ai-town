@@ -193,6 +193,12 @@ export class SimulationManager {
   start(): void {
     this.world.generate()
     this.initializeAgents(this.config.agentCount)
+
+    const firstAgent = this.agentManager?.getAgents()?.[0]
+    if (firstAgent) {
+      this.selectAgent(firstAgent.state.id)
+    }
+
     this.running = true
     this.lastTick = performance.now()
     this.gameLoop()
