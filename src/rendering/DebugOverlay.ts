@@ -201,7 +201,7 @@ export class DebugOverlay {
       })
       .join('')
 
-    listEl.scrollTop = listEl.scrollHeight
+    this.eventLogPanel.scrollTop = this.eventLogPanel.scrollHeight
   }
 
   public updateAgentStates(agents: AgentState[]): void {

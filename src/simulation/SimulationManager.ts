@@ -5,6 +5,7 @@ import { Renderer } from '@/rendering/Renderer'
 import { AgentManager } from '@/agent/AgentManager'
 import { LMStudioProvider, LMStudioConfig } from '@/ai/AIProvider'
 import { DebugOverlay } from '@/rendering/DebugOverlay'
+import { ConversationPanel } from '@/rendering/ConversationPanel'
 import { EventBus } from '@/interaction/EventBus'
 
 export class SimulationManager {
@@ -13,6 +14,7 @@ export class SimulationManager {
   private renderer: Renderer
   private agentManager: AgentManager | null
   private debugOverlay: DebugOverlay
+  private conversationPanel: ConversationPanel
   private eventBus: EventBus
   private config: SimulationConfig
 
@@ -65,6 +67,7 @@ export class SimulationManager {
 
     this.eventBus = new EventBus()
     this.debugOverlay = new DebugOverlay(this.eventBus)
+    this.conversationPanel = new ConversationPanel(this.eventBus)
 
     this.setupInput()
     this.setupDebugControls()
@@ -244,16 +247,19 @@ export class SimulationManager {
   }
 
   private updateDebugOverlay(): void {
-    if (!this.debugOverlay.isVisible()) return
     if (!this.agentManager) return
 
-    this.debugOverlay.updateEventLog()
-    this.debugOverlay.updateAgentStates(this.getAgentsArray())
-    this.debugOverlay.updateWorldState(
-      this.dayNight,
-      this.world.buildings.size,
-      this.events.length
-    )
+    if (this.debugOverlay.isVisible()) {
+      this.debugOverlay.updateEventLog()
+      this.debugOverlay.updateAgentStates(this.getAgentsArray())
+      this.debugOverlay.updateWorldState(
+        this.dayNight,
+        this.world.buildings.size,
+        this.events.length
+      )
+    }
+
+    this.conversationPanel.update(this.agentManager.getAgents())
   }
 
   private updateSelectedAgentFollow(): void {
@@ -419,5 +425,9 @@ export class SimulationManager {
 
   getEventBus(): EventBus {
     return this.eventBus
+  }
+
+  getConversationPanel(): ConversationPanel {
+    return this.conversationPanel
   }
 }
