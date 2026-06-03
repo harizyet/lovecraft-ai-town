@@ -1,8 +1,10 @@
 # AI Town Simulation
 
+![AITown](ai-town.png)
+
 > ## ⚠️ WARNING: DO NOT USE WITH PAID LLM SERVICES ⚠️
 >
-> This project makes an LLM API call **every ~1 second per agent**. With 8 agents (the default), that's **~8,640 API calls per day**. Pointing this at any paid LLM service (OpenAI, Anthropic, Google, etc.) will rack up a significant bill very quickly. **Only use with a local, free LLM** such as LM Studio or Ollama.
+> This project makes an LLM API call **every ~1 second per agent**. With 8 agents (the default), that's **~690,000 API calls per day**. Pointing this at any paid LLM service (OpenAI, Anthropic, Google, etc.) will rack up a significant bill very quickly. **Only use with a local, free LLM** such as LM Studio or Ollama.
 
 A 2D simulated town where LLM-powered AI agents live, interact, make decisions, and cause real-world consequences. Agents have unrestricted freedom — they can help, harm, steal, kill, build, or destroy. All actions are logged with full causation chains.
 
