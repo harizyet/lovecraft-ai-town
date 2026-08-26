@@ -53,6 +53,12 @@ export interface Tile {
   type: TileType
   walkable: boolean
   buildingId?: string
+  // 0..1 intensity of environmental corruption bleeding from nearby cult
+  // shrines, demons, or summoning rituals (see EnvironmentSystem). Absent
+  // (rather than 0) on every tile the system has never touched, so save
+  // files for existing worlds stay small and untouched tiles need no
+  // migration.
+  corruption?: number
 }
 
 export interface Building {
@@ -106,6 +112,7 @@ export enum ActionType {
   INVITE_CULT = 'invite_cult',
   BUILD_SHRINE = 'build_shrine',
   BRIBE = 'bribe',
+  CORRUPT = 'corrupt',
 }
 
 export enum EmotionalState {
@@ -440,7 +447,7 @@ export interface Rumour {
   timelineSummary?: string
 }
 
-export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used'
+export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted'
 
 export interface StoryMoment {
   id: string

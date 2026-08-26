@@ -30,6 +30,7 @@ import { OutsiderSystem, createOutsiderState } from '@/agent/systems/OutsiderSys
 import { SocialSystem, createSocialState } from '@/agent/systems/SocialSystem'
 import { ScheduleSystem, createScheduleState } from '@/agent/systems/ScheduleSystem'
 import { DecisionEngine, DecisionEngineSystems, createDecisionEngineState } from '@/agent/systems/DecisionEngine'
+import { EnvironmentSystem, createEnvironmentState } from '@/agent/systems/EnvironmentSystem'
 
 
 export class AgentManager {
@@ -55,6 +56,7 @@ export class AgentManager {
   private rumourSystem!: RumourSystem
   private religionSystem!: ReligionSystem
   private cultSystem!: CultSystem
+  private environmentSystem!: EnvironmentSystem
 
   constructor(
     world: World,
@@ -271,6 +273,7 @@ export class AgentManager {
     this.rumourSystem = new RumourSystem(deps, createRumourState())
     this.religionSystem = new ReligionSystem(deps, createReligionState())
     this.cultSystem = new CultSystem(deps, createCultState())
+    this.environmentSystem = new EnvironmentSystem(deps, createEnvironmentState())
     this.outsiderSystem = new OutsiderSystem(deps, createOutsiderState())
     this.socialSystem = new SocialSystem(deps, socialState)
     this.scheduleSystem = new ScheduleSystem(deps, scheduleState)
@@ -390,6 +393,9 @@ export class AgentManager {
       inquisitorOutsiderSpawned: this.outsiderSystem.state.inquisitorOutsiderSpawned,
       demonSummonCredits: this.religionSystem.state.demonSummonCredits,
       demonSummonSites: this.religionSystem.state.demonSummonSites,
+      environmentCorruption: Array.from(this.environmentSystem.state.corruption.entries()),
+      environmentAnnouncedTileKeys: Array.from(this.environmentSystem.state.announcedTileKeys),
+      environmentLandCorruptedEverNarrated: this.environmentSystem.state.landCorruptedEverNarrated,
     }
   }
 
@@ -446,6 +452,9 @@ export class AgentManager {
       this.agents.some((agent) => agent.state.outsider?.kind === 'inquisitor')
     this.religionSystem.state.demonSummonCredits = snapshot.demonSummonCredits ?? 0
     this.religionSystem.state.demonSummonSites = snapshot.demonSummonSites ?? []
+    this.environmentSystem.state.corruption = new Map(snapshot.environmentCorruption ?? [])
+    this.environmentSystem.state.announcedTileKeys = new Set(snapshot.environmentAnnouncedTileKeys ?? [])
+    this.environmentSystem.state.landCorruptedEverNarrated = snapshot.environmentLandCorruptedEverNarrated ?? false
     while (this.religionSystem.state.demonSummonSites.length < this.religionSystem.state.demonSummonCredits) {
       this.religionSystem.state.demonSummonSites.push(this.findTownEntrance())
     }
@@ -566,6 +575,7 @@ export class AgentManager {
         this.religionSystem.updateDemonAutonomousBehavior(agent)
       }
     }
+    this.environmentSystem.advanceCorruption()
     this.scheduleSystem.preventProlongedIdle()
     this.scheduleSystem.enforceWeatherSafety()
     this.religionSystem.ensureDailyPropheticClaim()

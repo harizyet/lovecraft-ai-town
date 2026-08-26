@@ -81,6 +81,7 @@ export class LMStudioProvider implements AIProvider {
   private availabilityCheckInFlight: boolean
   private lastAvailabilityCheck: number
   private queryStats: LLMQueryStats
+  private consecutiveFailures: number = 0
 
   constructor(config: LMStudioConfig) {
     this.config = {
@@ -98,12 +99,46 @@ export class LMStudioProvider implements AIProvider {
     void this.checkAvailability()
   }
 
+  private async fetchWithTracking(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+    try {
+      const response = await fetch(input, init)
+      if (!response.ok) {
+        this.handleFailure()
+      } else {
+        this.resetConsecutiveFailures()
+      }
+      return response
+    } catch (error) {
+      this.handleFailure()
+      throw error
+    }
+  }
+
+  private handleFailure(): void {
+    this.consecutiveFailures++
+    if (this.consecutiveFailures >= 3) {
+      window.dispatchEvent(
+        new CustomEvent('llm-consecutive-failures', {
+          detail: {
+            endpoint: this.config.endpoint,
+            model: this.config.model,
+            consecutiveFailures: this.consecutiveFailures,
+          },
+        })
+      )
+    }
+  }
+
+  private resetConsecutiveFailures(): void {
+    this.consecutiveFailures = 0
+  }
+
   private async checkAvailability(): Promise<void> {
     if (this.availabilityCheckInFlight) return
     this.availabilityCheckInFlight = true
     this.lastAvailabilityCheck = Date.now()
     try {
-      const resp = await fetch(`${this.config.endpoint}/v1/models`, {
+      const resp = await this.fetchWithTracking(`${this.config.endpoint}/v1/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(5000),
       })
@@ -130,7 +165,7 @@ export class LMStudioProvider implements AIProvider {
 
     const systemPrompt = this.buildSystemPrompt(agentName)
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -162,7 +197,7 @@ export class LMStudioProvider implements AIProvider {
     }
 
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -196,7 +231,7 @@ export class LMStudioProvider implements AIProvider {
     if (!this.available) throw new Error('LLM not available')
 
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -245,7 +280,7 @@ CONVERSATION RULES:
   ): Promise<PropheticInterpretation> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -310,7 +345,7 @@ CONVERSATION RULES:
   public async generateDailyPropheticClaim(agentName: string, prompt: string): Promise<string> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -340,7 +375,7 @@ CONVERSATION RULES:
   public async classifyForbiddenKnowledge(text: string): Promise<ForbiddenKnowledgeClassification> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -384,7 +419,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
   ): Promise<ExistentialReactionResult> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -429,7 +464,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
   public async generateCultName(claimText: string, revelationText: string): Promise<string> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -461,7 +496,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
   public async narrateKeyMoment(prompt: string): Promise<string> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -598,7 +633,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     if (!this.available) throw new Error('LLM not available')
 
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -639,7 +674,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     if (!this.available) throw new Error('LLM not available')
 
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -674,7 +709,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
   public async generatePoliticalEventText(prompt: string): Promise<{ question: string; description: string }> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -706,7 +741,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     if (!this.available) throw new Error('LLM not available')
 
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -736,7 +771,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     if (!this.available) throw new Error('LLM not available')
 
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -780,7 +815,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
   public async commentOnCourtOutcome(agentName: string, prompt: string): Promise<string> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
-    const response = await fetch(`${this.config.endpoint}/v1/chat/completions`, {
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

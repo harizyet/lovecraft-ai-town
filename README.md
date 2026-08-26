@@ -8,6 +8,8 @@ Framework forked from [AI Town](https://github.com/M1rceaDogaru/ai-town)
 
 A 2D simulated town where LLM-powered AI agents live, interact, make decisions, and cause real-world consequences. Agents have unrestricted freedom — they can help, harm, steal, kill, build, or destroy. All actions are logged with full causation chains.
 
+Inspired by the research paper [Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/pdf/2304.03442).
+
 ---
 
 ## 🌟 Features

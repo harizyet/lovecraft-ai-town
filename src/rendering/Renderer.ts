@@ -142,10 +142,37 @@ export class Renderer {
         this.ctx.fillStyle = this.tileColors[tile.type]
         this.ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize)
 
+        if (tile.corruption) {
+          this.renderCorruption(screenX, screenY, tile.type, tile.corruption)
+        }
+
         if (tile.type === TileType.TREE) {
           this.renderTree(screenX, screenY)
         }
       }
+    }
+  }
+
+  // Corruption bleeding from cult shrines, demons, or active summoning
+  // rituals (see EnvironmentSystem): water is tinted brackish, other tiles
+  // are tinted a sickly blight, and past a heavier threshold a translucent
+  // fog patch is layered on top -- a persistent, localized haze rather than
+  // the ambient, global weather overlay.
+  private renderCorruption(x: number, y: number, tileType: TileType, intensity: number): void {
+    const alpha = Math.min(0.85, intensity)
+    const tint = tileType === TileType.WATER ? `rgba(70, 74, 38, ${alpha})` : `rgba(84, 46, 94, ${alpha * 0.6})`
+    this.ctx.fillStyle = tint
+    this.ctx.fillRect(x, y, this.tileSize, this.tileSize)
+
+    if (intensity >= 0.5) {
+      const fogAlpha = (intensity - 0.5) * 0.7
+      const cx = x + this.tileSize / 2
+      const cy = y + this.tileSize / 2
+      const gradient = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, this.tileSize * 0.9)
+      gradient.addColorStop(0, `rgba(180, 190, 180, ${fogAlpha})`)
+      gradient.addColorStop(1, 'rgba(180, 190, 180, 0)')
+      this.ctx.fillStyle = gradient
+      this.ctx.fillRect(x - this.tileSize * 0.4, y - this.tileSize * 0.4, this.tileSize * 1.8, this.tileSize * 1.8)
     }
   }
 
@@ -417,7 +444,7 @@ export class Renderer {
     const padding = 15
     const lineHeight = 18
     const panelWidth = 390
-    const panelHeight = 240
+    const panelHeight = 258
     const timeStr = `${dayNight.hour.toString().padStart(2, '0')}:${Math.floor(dayNight.minute).toString().padStart(2, '0')}`
     const alive = agents.filter((a) => a.alive).length
     const dead = agents.filter((a) => !a.alive).length
@@ -457,6 +484,29 @@ export class Renderer {
     this.ctx.fillText(`Extreme belief/denial chance: ${(Math.max(0, Math.min(1, simulation.rumourExtremeBeliefProbability)) * 100).toFixed(0)}%`, padding + 10, y)
     y += lineHeight
     this.ctx.fillText(`LLM queries: ${simulation.llmQueries.made}  |  Successful: ${simulation.llmQueries.successful}`, padding + 10, y)
+    y += lineHeight
+    const corruption = this.computeCorruptionStats()
+    this.ctx.fillStyle = corruption.count > 0 ? '#ce93d8' : '#fff'
+    this.ctx.fillText(
+      corruption.count > 0
+        ? `Corruption: ${corruption.count} tile(s) tainted  |  Peak: ${Math.round(corruption.max * 100)}%`
+        : 'Corruption: none detected',
+      padding + 10,
+      y
+    )
+  }
+
+  private computeCorruptionStats(): { count: number; max: number } {
+    let count = 0
+    let max = 0
+    for (const row of this.world.tiles) {
+      for (const tile of row) {
+        if (!tile.corruption) continue
+        count++
+        if (tile.corruption > max) max = tile.corruption
+      }
+    }
+    return { count, max }
   }
 
   private wrapText(text: string, x: number, y: number, maxWidth: number, lineHeight: number): void {

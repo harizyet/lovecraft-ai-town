@@ -19,6 +19,7 @@ import { CourtPanel } from '@/rendering/CourtPanel'
 import { PolicyPanel } from '@/rendering/PolicyPanel'
 import { DeityChatPanel } from '@/rendering/DeityChatPanel'
 import { StoryNarrationPanel } from '@/rendering/StoryNarrationPanel'
+import { LLMErrorPanel } from '@/rendering/LLMErrorPanel'
 import { EventBus } from '@/interaction/EventBus'
 
 export class SimulationManager {
@@ -37,6 +38,8 @@ export class SimulationManager {
   private deityChatAutoPaused: boolean
   private eventBus: EventBus
   private config: SimulationConfig
+  private llmErrorPanel: LLMErrorPanel
+
 
   private agents: Map<string, AgentState>
   private events: SimulationEvent[]
@@ -106,6 +109,18 @@ export class SimulationManager {
     this.policyPanel = new PolicyPanel()
     this.deityChatPanel = new DeityChatPanel()
     this.storyNarrationPanel = new StoryNarrationPanel()
+    this.llmErrorPanel = new LLMErrorPanel(() => {
+      window.dispatchEvent(new CustomEvent('debug-refresh-agents'))
+    })
+
+    window.addEventListener('llm-consecutive-failures', (event) => {
+      const detail = (event as CustomEvent<{
+        endpoint: string
+        model: string
+        consecutiveFailures: number
+      }>).detail
+      this.llmErrorPanel.show(detail.endpoint, detail.model, detail.consecutiveFailures)
+    })
 
     this.setupInput()
     this.setupDebugControls()

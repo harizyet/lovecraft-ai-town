@@ -16,6 +16,7 @@ const KEY_MOMENT_LABELS: Record<StoryMomentKind, string> = {
   believer_poached: "an act of apostasy, not a conversion -- a villager who already knelt at another altar, whose faith belonged to a name and a congregation, quietly renouncing it to follow a rival cult instead; write this as a betrayal witnessed by the faith left behind, dwelling on what the convert once believed and the specific, private reasoning that let them break it -- doubt, hunger, desire, fear, or a promise the old god never made -- rather than treating it as a stranger's first awakening",
   demon_created: 'the first ritual summoning of a bound demon',
   deity_ability_first_used: "the first time in the village's history that a deity has directly answered an invocation with this particular power -- if the facts include a transcript of the deity speaking with a villager, treat the deity's exact words and the villager's replies as sacred, terrible dialogue and weave them into the prose rather than merely summarizing that a conversation occurred",
+  land_corrupted: "the moment the village's own ground first bears witness to what has been summoned or worshipped in secret -- a well gone brackish, a field's crop blackening in a single night, a fog that does not lift -- write this as the land itself keeping quiet, physical account of a sin no villager has yet confessed, noticed first by ordinary people going about ordinary chores who have no language for what they are seeing",
 }
 
 export class PromptBuilder {
