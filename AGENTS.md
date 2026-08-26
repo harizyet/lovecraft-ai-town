@@ -3,7 +3,7 @@
 ## Overview
 A 2D simulated town where LLM-powered AI agents live, interact, make decisions, and cause real-world consequences. Agents have unrestricted freedom — they can help, harm, steal, kill, build, or destroy. All actions are logged with full causation chains.
 
-**Status**: All planned features and major extensions fully implemented (~20,750 lines of TypeScript, 32 source files, zero runtime dependencies).
+**Status**: All planned features and major extensions fully implemented (~20,950 lines of TypeScript, 36 source files, zero runtime dependencies).
 
 ## Tech Stack
 - **TypeScript 6.0 + Vite 8** — ES modules, fast dev iteration
@@ -25,15 +25,19 @@ ai-town/
 │   │   └── [World.ts](file:///home/hariz/village/ai-town/src/world/World.ts)                   # Grid generation, buildings & clearance logic (459 lines)
 │   ├── agent/
 │   │   ├── [Agent.ts](file:///home/hariz/village/ai-town/src/agent/Agent.ts)                   # Individual agent parameters, needs, traits, memory (754 lines)
-│   │   ├── [AgentManager.ts](file:///home/hariz/village/ai-town/src/agent/AgentManager.ts)            # Simulation orchestration, schedules, agendas & LLM parsing (3371 lines)
-│   │   └── systems/                   # Extracted modular subsystems (Religion, Cult, Politics, Justice, Rumour, Story)
+│   │   ├── [AgentManager.ts](file:///home/hariz/village/ai-town/src/agent/AgentManager.ts)            # Thin orchestrator: wiring, main loop, snapshot save/restore (1223 lines)
+│   │   └── systems/                   # Extracted modular subsystems (10 systems + shared DI interface)
+│   │       ├── [RumourSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/RumourSystem.ts)        # Propagation, credibility, corroboration, investigation (2122 lines)
 │   │       ├── [CultSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/CultSystem.ts)          # Shrines, demonic summoning, cult mechanics (2109 lines)
-│   │       ├── [RumourSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/RumourSystem.ts)        # Propagation, credibility, corroboration (2122 lines)
 │   │       ├── [ReligionSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/ReligionSystem.ts)      # Faith, prophets, revelations, deity chat (1749 lines)
 │   │       ├── [JusticeSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/JusticeSystem.ts)       # Resolution courts, trials, voting, verdicts (936 lines)
-│   │       ├── [PoliticalSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/PoliticalSystem.ts)     # Gentry/Commons camps, town policy voting (879 lines)
+│   │       ├── [PoliticalSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/PoliticalSystem.ts)     # Gentry/Commons camps, town policy voting, Alderman, bribery (879 lines)
+│   │       ├── [DecisionEngine.ts](file:///home/hariz/village/ai-town/src/agent/systems/DecisionEngine.ts)      # LLM decision queue & the action dispatcher (875 lines)
+│   │       ├── [ScheduleSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/ScheduleSystem.ts)      # Daily plans, activity blocks, idle/weather/exhaustion handling (738 lines)
+│   │       ├── [SocialSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/SocialSystem.ts)        # Encounters, conversation batching & context (430 lines)
+│   │       ├── [OutsiderSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/OutsiderSystem.ts)      # Knight/Inquisitor spawning & combat (263 lines)
 │   │       ├── [StorySystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/StorySystem.ts)         # Narrates major story moments & events (201 lines)
-│   │       └── [SystemDeps.ts](file:///home/hariz/village/ai-town/src/agent/systems/SystemDeps.ts)          # Extracted interfaces for system decoupling (215 lines)
+│   │       └── [SystemDeps.ts](file:///home/hariz/village/ai-town/src/agent/systems/SystemDeps.ts)          # Shared dependency-injection interface between systems (260 lines)
 │   ├── ai/
 │   │   ├── [AIProvider.ts](file:///home/hariz/village/ai-town/src/ai/AIProvider.ts)              # OpenAI HTTP client & prompt system (1151 lines)
 │   │   └── [PromptBuilder.ts](file:///home/hariz/village/ai-town/src/ai/PromptBuilder.ts)           # Prompt construction from agent state (482 lines)
@@ -71,7 +75,7 @@ main.ts
         ├── Renderer (Canvas 2D draw calls, weather effects, lighting overlay)
         ├── DebugOverlay (DOM-based debug panel)
         ├── EventBus (central event pub/sub)
-        └── AgentManager (agent orchestration & extracted subsystems)
+        └── AgentManager (thin orchestrator: constructs Systems, wires SystemDeps, runs update loop)
               ├── Agent[] (individual agent state, movement, memory, faith, sanity)
               ├── AIProvider (LLM HTTP client, prophetic/cult prompt extensions)
               ├── PromptBuilder (prompt construction, context injection)
@@ -79,14 +83,25 @@ main.ts
               ├── WorldInteraction (agent-to-world interactions)
               ├── ConversationManager (conversation lifecycle)
               ├── AStarPathfinder (pathfinding)
-              └── Systems (Modular extracted simulation logic)
+              └── Systems (agent/systems/*.ts — talk to each other only through SystemDeps)
+                    ├── RumourSystem (Rumour spread, credibility, corroboration, investigation)
                     ├── CultSystem (Summoning rites, shrines, demonic targeting, mob tracking)
-                    ├── RumourSystem (Rumour spread, credibility updates, corroboration, thoughts)
                     ├── ReligionSystem (Faith levels, Prophet revelations, deity chat commands)
                     ├── JusticeSystem (Resolution Court trials, voter defense speeches, verdicts)
                     ├── PoliticalSystem (Gentry vs. Commons camps, policy town assemblies)
+                    ├── DecisionEngine (LLM decision queue, executeLLMDecision dispatcher)
+                    ├── ScheduleSystem (Daily plans, activity blocks, weather/idle handling)
+                    ├── SocialSystem (Encounters, conversation batching)
+                    ├── OutsiderSystem (Knight/Inquisitor spawning & combat)
                     └── StorySystem (Chronicles major town events, alerts, and narrations)
 ```
+
+Each system is constructed once by `AgentManager` and receives a `SystemDeps` object (built
+from `AgentManager`'s own fields/bound methods) rather than a back-reference to `AgentManager`
+itself or to sibling systems — this is what keeps the split from just becoming eleven files
+that all still secretly depend on each other's internals. `DecisionEngine`, as the one dispatcher
+that legitimately needs to reach every subsystem, is the sole exception and holds direct typed
+references to the other nine systems.
 
 ---
 
@@ -103,8 +118,8 @@ main.ts
 | 5 | **Pathfinding** | `AStarPathfinder.ts` | A*, 4-directional, Manhattan heuristic, smooth movement |
 | 6 | **Agent rendering** | `Renderer.ts` | Hash-colored circles, names, health bars, emotion dots, dead bodies with "RIP" |
 | 7 | **LLM client** | `AIProvider.ts` | OpenAI-compatible, markdown fence stripping, action normalization |
-| 8 | **Decision loop** | `AgentManager.ts` | Event-driven schedules/decisions; serialized LLM lane with blocking retry |
-| 9 | **Memory system** | `Agent.ts`, `AgentManager.ts` | Recent buffer + deterministic day-boundary compaction |
+| 8 | **Decision loop** | `DecisionEngine.ts`, `ScheduleSystem.ts` | Event-driven schedules/decisions; serialized LLM lane with blocking retry |
+| 9 | **Memory system** | `Agent.ts`, `ScheduleSystem.ts` | Recent buffer + deterministic day-boundary compaction |
 | 10 | **Prompt design** | `PromptBuilder.ts`, `AIProvider.ts` | Full system prompt: personality, action formatting, JSON-only output |
 | 11 | **Event bus** | `EventBus.ts` | Pub/sub with wildcard `*`, timestamped event queries |
 | 12 | **Agent-to-agent** | `AgentInteraction.ts`, `ConversationManager.ts` | Attack (20-50 dmg), steal, help (15-25 heal), flee, conversation |
@@ -114,7 +129,7 @@ main.ts
 | 16 | **Debug overlay** | `DebugOverlay.ts` | F1 toggle, 400px panel, event log, agent inspect, CSV/JSON log export |
 | 17 | **Simulation controls** | `SimulationManager.ts` | Pause (Space), speed multiplier, day/night cycles |
 | 18 | **Log export** | `DebugOverlay.ts` | Export logs as JSON or CSV |
-| 19 | **Weather system** | `SimulationManager.ts`, `AgentManager.ts` | Transitions (clear/cloudy/rain/storm); weather-affected behavior |
+| 19 | **Weather system** | `SimulationManager.ts`, `ScheduleSystem.ts` | Transitions (clear/cloudy/rain/storm); weather-affected behavior |
 | 20 | **Rumour propagation** | `RumourSystem.ts` | Rumour seeding, spreading in conversation, thought creation, credibility tracking |
 | 21 | **Divine Whispers & Chat** | `DeityChatPanel.ts`, `ReligionSystem.ts` | Allow the user to act as a deity, whisper commands to agents, and chat directly |
 | 22 | **Prophets & Revelations** | `ReligionSystem.ts` | Prophet role transitions, daily prophetic tasks (sacrifices, warn, convert) |
@@ -123,9 +138,9 @@ main.ts
 | 25 | **Resolution Courts** | `JusticeSystem.ts`, `CourtPanel.ts` | Trial assemblies, LLM voter defenses, voting to Absolve, Exile, or Execute |
 | 26 | **Political Camps** | `PoliticalSystem.ts`, `PolicyPanel.ts` | Division of town into Gentry/Commons; town assemblies to vote on economic/exile policies |
 | 27 | **Office of the Alderman** | `PoliticalSystem.ts` | Reaching unanimous cult town conversion triggers election, granting decree power |
-| 28 | **Outsider Escalation** | `AgentManager.ts` | Spawn Knights (investigating death) and Inquisitors (combating cults) |
+| 28 | **Outsider Escalation** | `OutsiderSystem.ts` | Spawn Knights (investigating death) and Inquisitors (combating cults) |
 | 29 | **Story Narration HUD** | `StorySystem.ts`, `StoryNarrationPanel.ts` | Visual log detailing major town narrative milestones |
-| 30 | **Vocation Systems & Idle Watchdog** | `Agent.ts`, `AgentManager.ts` | stuck/idle watchdog triggering `idle_recovery` behavior |
+| 30 | **Vocation Systems & Idle Watchdog** | `Agent.ts`, `ScheduleSystem.ts` | stuck/idle watchdog triggering `idle_recovery` behavior |
 
 ### Partially Implemented / Simplified
 
@@ -296,6 +311,20 @@ The event queues an LLM reaction for affected agents
 ### Story Narration Subsystem (`StorySystem.ts`)
 - Chronicles major town events and milestones (cult formation, prophet appointments, demonic summons, trials, etc.).
 - Feeds these moments to a custom UI panel (`StoryNarrationPanel`) for visual display and narrative tracking.
+
+### Scheduling Subsystem (`ScheduleSystem.ts`)
+- Generates and validates each agent's daily plan, starts/completes timed activity blocks, and runs the fallback/idle-recovery, exhaustion-sleep, night-sleep, and storm-shelter-seeking checks every tick.
+- Owns `activeBlocks`/`dailySchedules` and every other system reaches it only through the shared `SystemDeps.startBlock`/`getAbsoluteMinute` callbacks — nothing else on the timeline manipulates blocks directly.
+
+### Decision Engine (`DecisionEngine.ts`)
+- Owns the per-agent LLM decision queue and `executeLLMDecision`, the dispatcher that turns a parsed LLM response into a concrete action (move/talk/attack/pray/preach/bribe/etc.) and routes it into whichever subsystem owns that action.
+- The one place in the codebase that legitimately needs direct references to all nine other systems, since a single decision can touch rumours, cult, religion, justice, or politics in the same turn.
+
+### Social Subsystem (`SocialSystem.ts`)
+- Detects agent-to-agent encounters, batches/pre-generates conversation turns, and builds the contextual dialogue (including rumour mentions) fed to the LLM for a conversation turn.
+
+### Outsider Subsystem (`OutsiderSystem.ts`)
+- Spawns and drives Knights (arrive after repeated deaths) and Inquisitors (arrive when a Priest confirms multiple cultists), including their patrol/pursuit/combat behavior once in the world.
 
 ### Logging
 - Every action logged: timestamp, agent, action type, target, outcome, world-state delta

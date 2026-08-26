@@ -1,4 +1,5 @@
-# AI Town Simulation
+# Lovecraft AI Town Simulation
+Framework forked from [AI Town](https://github.com/M1rceaDogaru/ai-town)
 
 ![AITown](ai-town.png)
 
@@ -114,7 +115,19 @@ ai-town/
 │   │   └── World.ts                   # Grid generation, buildings & clearance logic
 │   ├── agent/
 │   │   ├── Agent.ts                   # Individual agent parameters, needs, traits, memory
-│   │   └── AgentManager.ts            # Simulation orchestration, schedules, agendas & LLM parsing
+│   │   ├── AgentManager.ts            # Thin orchestrator: wiring, main loop, snapshot save/restore
+│   │   └── systems/                   # Extracted subsystems (see below)
+│   │       ├── RumourSystem.ts        # Rumour creation, propagation, belief, investigation
+│   │       ├── CultSystem.ts          # Cult formation, leadership, conversion, shrines, mobs
+│   │       ├── ReligionSystem.ts      # Faith, prophets, revelations, deity chat & abilities
+│   │       ├── JusticeSystem.ts       # Resolution courts: defense, votes, verdicts
+│   │       ├── PoliticalSystem.ts     # Gentry/Commons camps, policy votes, Alderman, bribery
+│   │       ├── ScheduleSystem.ts      # Daily plans, activity blocks, idle/weather/exhaustion handling
+│   │       ├── DecisionEngine.ts      # LLM decision queue & the action dispatcher
+│   │       ├── SocialSystem.ts        # Encounters, conversation batching & context
+│   │       ├── OutsiderSystem.ts      # Knight/Inquisitor spawning & combat
+│   │       ├── StorySystem.ts         # Narrates major story moments
+│   │       └── SystemDeps.ts          # Shared dependency-injection interface between systems
 │   ├── ai/
 │   │   ├── AIProvider.ts              # OpenAI HTTP client & markdown stripping
 │   │   └── PromptBuilder.ts           # Prompt engineering and instruction building
@@ -123,15 +136,31 @@ ai-town/
 │   ├── rendering/
 │   │   ├── Renderer.ts                # Canvas 2D engine, text tags & overlay filters
 │   │   ├── Camera.ts                  # Target tracking & interpolation
-│   │   └── DebugOverlay.ts            # Sidebar debug, whispers & JSON/CSV log export
+│   │   ├── DebugOverlay.ts            # Sidebar debug, whispers & JSON/CSV log export
+│   │   ├── ConversationPanel.ts       # Active conversation UI
+│   │   ├── CourtPanel.ts              # Resolution court trial UI
+│   │   ├── PolicyPanel.ts             # Town assembly / policy vote UI
+│   │   ├── StoryNarrationPanel.ts     # Story moment narration UI
+│   │   └── DeityChatPanel.ts          # Whisper & deity command UI
 │   ├── interaction/
 │   │   ├── EventBus.ts                # Wildcard-supported pub/sub dispatcher
 │   │   ├── AgentInteraction.ts        # Direct interactions (help, attack, steal, etc.)
 │   │   ├── ConversationManager.ts     # Conversation state machine
 │   │   └── WorldInteraction.ts        # Structural world actions (harvest, work, build shrine)
 │   ├── utils/
-│   │   └── AStarPathfinder.ts         # Pathfinding implementation
+│   │   ├── AStarPathfinder.ts         # Pathfinding implementation
+│   │   ├── RumourRules.ts             # Static rules for rumour eligibility/classification
+│   │   ├── ForbiddenKnowledgeRules.ts # Rules for forbidden/existential claim classification
+│   │   ├── PolicyRules.ts             # Policy proposal catalog
+│   │   └── JobIcons.ts                # Vocation icon map
 │   └── main.ts                        # Main launcher and config setup
 ```
+
+`AgentManager.ts` used to be a single ~11,000-line class holding every subsystem as inline
+private methods; it's now ~1,200 lines of pure orchestration, with each subsystem broken out
+into its own file under `src/agent/systems/`, communicating through the shared `SystemDeps`
+interface rather than reaching into each other directly. `SimulationManager.ts` and every
+rendering panel only ever called `AgentManager`'s public API, so the split required zero
+changes outside `agent/`.
 
 Refer to [SOCIAL.md](./SOCIAL.md) and [AGENTS.md](./AGENTS.md) for deeper implementation and feature documentation.

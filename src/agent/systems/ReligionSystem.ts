@@ -64,6 +64,7 @@ export class ReligionSystem {
   public registerGodInvocation(event: SimulationEvent): void {
     if (event.worldStateDelta.cultSacrifice === true) {
       const sacrificer = this.deps.getAgents().find((agent) => agent.state.id === event.agentId)
+      if (sacrificer?.state.cult?.id.startsWith('cult_christian_') && sacrificer.state.cult.name === 'The Church of Christ') return
       this.state.godInterventionCredits = Math.min(10, this.state.godInterventionCredits + 2)
       this.state.lastGodInvocation = `Cult sacrifice: ${event.description}`
       if (sacrificer) this.state.lastInvokedDeityName = this.chooseDeityName(sacrificer)
@@ -76,6 +77,7 @@ export class ReligionSystem {
     if (!religiousActions.has(event.actionType) || event.type !== 'cult_ability') return
     const worshipper = this.deps.getAgents().find((agent) => agent.state.id === event.agentId)
     if (!worshipper?.state.alive) return
+    if (worshipper.state.cult?.id.startsWith('cult_christian_') && worshipper.state.cult.name === 'The Church of Christ') return
     const actsThroughCult = Boolean(worshipper.state.cult)
     // Any deity the worshipper holds with meaningful confidence can grant an
     // invocation, not only "God" specifically — abilities answer whichever
