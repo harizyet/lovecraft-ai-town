@@ -706,3 +706,34 @@ Independent of any player action, cult-unaligned villagers can also have a night
 Either kind of dream is temporary: it persists through the villager's following waking hours (and is visible in the Agent States detail popup, tagged by source — "player" or "spontaneous") but is cleared automatically the next time that villager falls asleep again, whether or not a new one replaces it.
 
 Believers include an explicit `pray` block in each remaining daily schedule. The planning prompt requests it naturally, and schedule validation repairs an omitted prayer by splitting a suitable work, rest, talk, or idle block without creating an overlap; if necessary it appends a short prayer before the end of the day. Prayer is available to believers outside cults as well as cult members, and worship directed toward any deity held with meaningful confidence — not only God — qualifies for a deity-intervention credit.
+
+## Forbidden Relics
+
+Forbidden Relics are physical objects left behind in the world that act as permanent, map-visible hazards. When an agent discovers and reads a relic, it can impact their sanity, introduce forbidden knowledge, or sway them to join a cult. Relics are rendered on the map as diamond markers and are fully persisted through world saves/loads.
+
+### Creation Paths
+
+Forbidden Relics can be generated in two ways:
+
+1. **Organic Investigation Writing (16% Chance)**:
+   - When a vocation-based investigation concludes (whether verified or unsubstantiated), the investigator has a flat 16% chance (`RELIC_CREATION_CHANCE`) to pen their findings into a physical relic.
+   - A separate roll decides if the relic's text contains forbidden knowledge. The base chance is 35%, which increases by 30% if the author already carries forbidden knowledge, and by 15% if the rumour text is cult-related (referencing cults, rituals, heretics, demons, deities, etc.), capped at 85%.
+   - If it contains forbidden knowledge, the author immediately faces an existential-witness sanity check (risk of nihilism, obsession, or permanent insanity).
+   - If the author belongs to a cult, the relic is tagged with their cult's ID, cult name, and deity.
+
+2. **Deity Command (Create Forbidden Relic)**:
+   - The player can invoke the **Create Relic** deity ability at the cost of one invocation credit.
+   - The user inputs custom revelation text and specifies an associated deity.
+   - The simulation enters a map placement mode where the player clicks a grid tile to place the relic.
+   - Deity relics have a fixed severity of 90, are marked as containing forbidden knowledge, and are authored by `'deity'` (Divine Manifestation).
+
+### Discovery and Interaction
+
+* **Periodic Watchdog**: The `RelicSystem.advanceRelics()` loop ticks once per simulated minute.
+* **Proximity Trigger**: If any living agent wanders within a 2.5-tile discovery radius (`DISCOVERY_RADIUS`) of a relic, they read its contents.
+* **Target Filter**: An agent is only affected if they are not the relic's author and they are either not in the relic's cult, or they belong to an opposed group.
+* **One-time Read**: Each agent can only discover and read a specific relic once (`discoveredByAgentIds`).
+* **Consequences**:
+  - **Deity Relics**: If the discovering agent already believes in the associated deity (confidence >= 50%), they are unaffected. Otherwise, they acquire the text as forbidden knowledge and face an immediate **80% chance of permanent insanity** (`'madness'` reaction). If they pass the 80% sanity check, they resolve the knowledge via normal existential-witness reactions.
+  - **Organic Relics with Forbidden Knowledge**: The agent undergoes a standard existential-witness reaction check.
+  - **Cult Alignment**: If the relic is cult-tagged, the agent has a personality-weighted chance (scaled by curiosity and caution) to willingly join the associated cult. Specifically, the base chance is 35% if the relic is forbidden (20% if not), boosted by `curiosity * 0.25` and penalized by `caution * 0.2`. If they pass, they trigger `maybeTriggerWillingCultJoin` toward the deity.
