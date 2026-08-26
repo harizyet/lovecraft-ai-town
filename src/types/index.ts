@@ -89,6 +89,36 @@ export interface WorldObject {
   expiresAt?: number
 }
 
+// A physical object a Priest/Inquisitor/investigator may leave behind after
+// completing an investigation (see RelicSystem): their written findings,
+// possibly laced with forbidden knowledge if the investigation brushed up
+// against something that shouldn't be understood. Visible on the map and
+// persists until the world is regenerated -- unlike a rumour or a whisper,
+// it is a standing, re-discoverable hazard/lure rather than a one-time
+// narrative beat.
+export interface ForbiddenRelic {
+  id: string
+  position: Vector2
+  title: string
+  // The investigator's penned findings -- what a reader actually learns.
+  text: string
+  authorAgentId: string
+  authorName: string
+  // Set only when the author belonged to a cult at the time of writing: ties
+  // the relic to that cult's deity, so a non-member who is swayed by it is
+  // pulled toward that specific faith rather than a generic one.
+  cultId?: string
+  cultName?: string
+  deityName?: string
+  containsForbiddenKnowledge: boolean
+  // 0 when containsForbiddenKnowledge is false; otherwise the severity fed
+  // into applyExistentialWitnessReaction for both the author (at creation)
+  // and any later reader (at discovery).
+  severity: number
+  createdAtMinute: number
+  discoveredByAgentIds: string[]
+}
+
 export enum ActionType {
   MOVE = 'move',
   TALK = 'talk',
@@ -455,7 +485,7 @@ export interface Rumour {
   timelineSummary?: string
 }
 
-export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight'
+export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight' | 'forbidden_relic_created'
 
 export interface StoryMoment {
   id: string
@@ -612,7 +642,7 @@ export interface AgentState {
   }
   permanentInsanity?: {
     causedAtMinute: number
-    source: 'divine_manifestation' | 'demon_manifestation' | 'forbidden_knowledge'
+    source: 'divine_manifestation' | 'demon_manifestation' | 'forbidden_knowledge' | 'forbidden_relic'
     reason: string
   }
   // A bias or nightmare either planted by the player while this agent slept

@@ -1,7 +1,7 @@
 import { Agent } from '@/agent/Agent'
 import { World } from '@/world/World'
 import { SimulationManager } from '@/simulation/SimulationManager'
-import { AIProvider, PropheticTask } from '@/ai/AIProvider'
+import { AIProvider, PropheticTask, ExistentialReactionResult } from '@/ai/AIProvider'
 import { PromptBuilder } from '@/ai/PromptBuilder'
 import { EventBus } from '@/interaction/EventBus'
 import { AgentInteraction } from '@/interaction/AgentInteraction'
@@ -162,6 +162,13 @@ export interface SystemDeps {
     severityHint: number,
     insanitySource: NonNullable<AgentState['permanentInsanity']>['source']
   ): void
+  resolveExistentialReaction(
+    recipient: Agent,
+    interpretation: ExistentialReactionResult,
+    severity: number,
+    sourceText: string,
+    insanitySource: NonNullable<AgentState['permanentInsanity']>['source']
+  ): void
   // Cult subsystem (CultSystem.ts).
   promoteCultSuccessor(formerLeader: Agent, preferredSuccessorId: string | undefined, reason: string): void
   isConversionImmune(agent: Agent): boolean
@@ -206,6 +213,10 @@ export interface SystemDeps {
   applyResurrectionInsanity(target: Agent, sourceName: string, includeExecuteVoterInsanity: boolean): number
   getProphetAgentId(): string | null
   grantDemonSummonCredit(site: { x: number; y: number }): number
+
+  // Relic subsystem (RelicSystem.ts) -- called once a rumour investigation
+  // has finished, to give it a chance of leaving a Forbidden Relic behind.
+  maybeCreateForbiddenRelic(agent: Agent, rumour: Rumour, causationId: string): void
 
   // Shared by JusticeSystem and PoliticalSystem verdicts/outcomes.
   banishAgent(agent: Agent, reason: string, policySessionId: string): void

@@ -31,6 +31,7 @@ import { SocialSystem, createSocialState } from '@/agent/systems/SocialSystem'
 import { ScheduleSystem, createScheduleState } from '@/agent/systems/ScheduleSystem'
 import { DecisionEngine, DecisionEngineSystems, createDecisionEngineState } from '@/agent/systems/DecisionEngine'
 import { EnvironmentSystem, createEnvironmentState } from '@/agent/systems/EnvironmentSystem'
+import { RelicSystem, createRelicState } from '@/agent/systems/RelicSystem'
 
 
 export class AgentManager {
@@ -57,6 +58,7 @@ export class AgentManager {
   private religionSystem!: ReligionSystem
   private cultSystem!: CultSystem
   private environmentSystem!: EnvironmentSystem
+  private relicSystem!: RelicSystem
 
   constructor(
     world: World,
@@ -158,6 +160,8 @@ export class AgentManager {
         this.rumourSystem.applyRumourProvenanceBelief(rumour, agent, belief, forceAcceptance),
       applyExistentialWitnessReaction: (witness, sourceText, severityHint, insanitySource) =>
         this.rumourSystem.applyExistentialWitnessReaction(witness, sourceText, severityHint, insanitySource),
+      resolveExistentialReaction: (recipient, interpretation, severity, sourceText, insanitySource) =>
+        this.rumourSystem.resolveExistentialReaction(recipient, interpretation, severity, sourceText, insanitySource),
 
       findProvenCult: () => this.cultSystem.findProvenCult(),
       promoteCultSuccessor: (formerLeader, preferredSuccessorId, reason) =>
@@ -196,6 +200,8 @@ export class AgentManager {
         this.religionSystem.state.demonSummonSites.push(site)
         return this.religionSystem.state.demonSummonCredits
       },
+      maybeCreateForbiddenRelic: (agent, rumour, causationId) =>
+        this.relicSystem.maybeCreateRelicFromInvestigation(agent, rumour, causationId),
 
       banishAgent: (agent, reason, policySessionId) => this.banishAgent(agent, reason, policySessionId),
 
@@ -275,6 +281,7 @@ export class AgentManager {
     this.religionSystem = new ReligionSystem(deps, createReligionState())
     this.cultSystem = new CultSystem(deps, createCultState())
     this.environmentSystem = new EnvironmentSystem(deps, createEnvironmentState())
+    this.relicSystem = new RelicSystem(deps, createRelicState())
     this.outsiderSystem = new OutsiderSystem(deps, createOutsiderState())
     this.socialSystem = new SocialSystem(deps, socialState)
     this.scheduleSystem = new ScheduleSystem(deps, scheduleState)
@@ -400,6 +407,7 @@ export class AgentManager {
       environmentSustainedHighMinutes: Array.from(this.environmentSystem.state.sustainedHighMinutes.entries()),
       environmentBlightedTileKeys: Array.from(this.environmentSystem.state.blightedTileKeys),
       environmentEldritchBlightEverNarrated: this.environmentSystem.state.eldritchBlightEverNarrated,
+      relicCounter: this.relicSystem.state.relicCounter,
     }
   }
 
@@ -462,6 +470,7 @@ export class AgentManager {
     this.environmentSystem.state.sustainedHighMinutes = new Map(snapshot.environmentSustainedHighMinutes ?? [])
     this.environmentSystem.state.blightedTileKeys = new Set(snapshot.environmentBlightedTileKeys ?? [])
     this.environmentSystem.state.eldritchBlightEverNarrated = snapshot.environmentEldritchBlightEverNarrated ?? false
+    this.relicSystem.state.relicCounter = snapshot.relicCounter ?? 0
     while (this.religionSystem.state.demonSummonSites.length < this.religionSystem.state.demonSummonCredits) {
       this.religionSystem.state.demonSummonSites.push(this.findTownEntrance())
     }
@@ -583,6 +592,7 @@ export class AgentManager {
       }
     }
     this.environmentSystem.advanceCorruption()
+    this.relicSystem.advanceRelics()
     this.scheduleSystem.preventProlongedIdle()
     this.scheduleSystem.enforceWeatherSafety()
     this.religionSystem.ensureDailyPropheticClaim()
@@ -687,6 +697,25 @@ export class AgentManager {
     deityNameOverride?: string
   ): { success: boolean; message: string } {
     return this.religionSystem.plantDream(targetAgentId, biasText, deityNameOverride)
+  }
+
+  public placeDeityForbiddenRelic(
+    tileX: number,
+    tileY: number,
+    text: string,
+    deityName?: string
+  ): { success: boolean; message: string } {
+    if (this.religionSystem.state.godInterventionCredits <= 0) {
+      return { success: false, message: 'No worship or cult rite has invoked a deity.' }
+    }
+    const finalDeityName = deityName?.trim() || this.religionSystem.state.lastInvokedDeityName || 'God'
+    this.relicSystem.createDeityForbiddenRelic(tileX, tileY, text, finalDeityName)
+    this.religionSystem.state.godInterventionCredits--
+    return { success: true, message: `Placed the forbidden relic of ${finalDeityName} on the map!` }
+  }
+
+  public getGodInterventionCredits(): number {
+    return this.religionSystem.state.godInterventionCredits
   }
 
   public beginDeityConversation(

@@ -1685,6 +1685,7 @@ Your private reaction: ${thoughtEvent.description}`,
     agent.addRecentMemory(event)
     this.reviseBeliefFromFinding(rumour, agent)
     this.addRumourThought(rumour, agent, [event.id], true)
+    this.deps.maybeCreateForbiddenRelic(agent, rumour, causationId)
     return `${event.description}. ${rumour.finding}`
   }
 

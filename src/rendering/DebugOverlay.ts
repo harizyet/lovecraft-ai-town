@@ -16,7 +16,7 @@ export class DebugOverlay {
   private rumourTrackerPanel: HTMLDivElement
   private controlsPanel: HTMLDivElement
   private godAbilityConfirmPanel: HTMLDivElement
-  private pendingGodAbility: 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather' | 'speak' | 'dream' | null
+  private pendingGodAbility: 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather' | 'speak' | 'dream' | 'create_relic' | null
   private agentDetailsPanel: HTMLDivElement
   private cultTrackerPanel: HTMLDivElement
   private cultDetailsPanel: HTMLDivElement
@@ -232,7 +232,7 @@ export class DebugOverlay {
         <div id="god-abilities-content" style="display:none;">
           <div id="god-invocation-source" style="max-width:420px;margin:3px 0 6px;color:#9e8f67;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Waiting for worship directed toward a deity.</div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            ${['bless', 'heal', 'smite', 'resurrect', 'manifest', 'weather', 'speak', 'dream'].map((ability) => `<button data-god-ability="${ability}" disabled style="padding:4px 8px;border:0;border-radius:3px;background:#51482d;color:#8d8469;cursor:not-allowed;text-transform:capitalize;">${ability}</button>`).join('')}
+            ${['bless', 'heal', 'smite', 'resurrect', 'manifest', 'weather', 'speak', 'dream', 'create_relic'].map((ability) => `<button data-god-ability="${ability}" disabled style="padding:4px 8px;border:0;border-radius:3px;background:#51482d;color:#8d8469;cursor:not-allowed;text-transform:capitalize;">${ability.replace(/_/g, ' ')}</button>`).join('')}
           </div>
           <div id="god-ability-status" style="min-height:14px;margin-top:4px;color:#9e9e9e;font-size:10px;"></div>
         </div>
@@ -514,12 +514,12 @@ export class DebugOverlay {
     const error = panel.querySelector<HTMLElement>('#god-ability-confirm-error')
     if (!title || !targetRow || !targetSelect || !deityRow || !deitySelect || !deityCustom || !weatherRow || !dreamRow || !dreamText || !error) return
 
-    if (title) title.textContent = `Confirm: ${ability.charAt(0).toUpperCase()}${ability.slice(1)}`
+    if (title) title.textContent = `Confirm: ${ability.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`
     if (error) error.textContent = ''
     deityCustom.value = ''
     dreamText.value = ''
 
-    const needsTarget = ability !== 'weather'
+    const needsTarget = ability !== 'weather' && ability !== 'create_relic'
     targetRow.style.display = needsTarget ? 'block' : 'none'
     if (needsTarget) {
       const eligible = ability === 'resurrect'
@@ -537,10 +537,16 @@ export class DebugOverlay {
           : options.join('')
     }
 
-    deityRow.style.display = ability === 'manifest' || ability === 'speak' ? 'block' : 'none'
-    if (ability === 'manifest' || ability === 'speak') {
+    deityRow.style.display = ability === 'manifest' || ability === 'speak' || ability === 'create_relic' ? 'block' : 'none'
+    if (ability === 'manifest' || ability === 'speak' || ability === 'create_relic') {
       const deityLabel = panel.querySelector<HTMLElement>('#god-ability-confirm-deity-label')
-      if (deityLabel) deityLabel.textContent = ability === 'speak' ? 'Speak as' : 'Manifest as'
+      if (deityLabel) {
+        deityLabel.textContent = ability === 'speak' 
+          ? 'Speak as' 
+          : ability === 'create_relic' 
+            ? 'Associate Deity' 
+            : 'Manifest as'
+      }
       const knownDeities = Array.from(new Set(
         this.latestAgents.flatMap((agent) => agent.beliefSystem.deities.map((deity) => deity.name.trim()))
           .filter((name) => name.length > 0)
@@ -552,7 +558,30 @@ export class DebugOverlay {
     }
 
     weatherRow.style.display = ability === 'weather' ? 'block' : 'none'
-    dreamRow.style.display = ability === 'dream' ? 'block' : 'none'
+    
+    const isDream = ability === 'dream'
+    const isRelic = ability === 'create_relic'
+    dreamRow.style.display = (isDream || isRelic) ? 'block' : 'none'
+    if (isDream || isRelic) {
+      const dreamLabel = panel.querySelector<HTMLElement>('#god-ability-confirm-dream-label')
+      const dreamHint = panel.querySelector<HTMLElement>('#god-ability-confirm-dream-hint')
+      if (dreamLabel) {
+        dreamLabel.textContent = isRelic 
+          ? 'Relic revelation text (forces existential shock on non-believers)' 
+          : 'Bias to plant (only sleeping, cult-unaligned villagers)'
+      }
+      if (dreamText) {
+        dreamText.placeholder = isRelic
+          ? 'e.g. The town is a simulation. Antigravity controls the sky.'
+          : 'e.g. The well water is poisoned. Trust no one wearing red.'
+      }
+      const actualHint = panel.querySelector<HTMLElement>('#god-ability-confirm-dream-row div') || dreamHint
+      if (actualHint) {
+        actualHint.textContent = isRelic
+          ? 'Non-believers who stumble upon this relic gain this knowledge but face a high chance of insanity.'
+          : 'Lower sanity raises the odds this curdles into a nightmare instead of an ordinary dream.'
+      }
+    }
 
     panel.style.display = 'flex'
   }
@@ -569,12 +598,12 @@ export class DebugOverlay {
     const error = panel.querySelector<HTMLElement>('#god-ability-confirm-error')
 
     const targetAgentId = targetSelect?.value || undefined
-    if (ability !== 'weather' && ability !== 'manifest' && !targetAgentId) {
+    if (ability !== 'weather' && ability !== 'manifest' && ability !== 'create_relic' && !targetAgentId) {
       if (error) error.textContent = 'Select a target.'
       return
     }
 
-    const deityName = ability === 'manifest' || ability === 'speak'
+    const deityName = ability === 'manifest' || ability === 'speak' || ability === 'create_relic'
       ? (deityCustom?.value.trim() || deitySelect?.value || undefined)
       : undefined
 
@@ -594,6 +623,19 @@ export class DebugOverlay {
       }
       window.dispatchEvent(new CustomEvent('debug-plant-dream', {
         detail: { targetAgentId, biasText },
+      }))
+      this.closeGodAbilityConfirm()
+      return
+    }
+
+    if (ability === 'create_relic') {
+      const relicText = dreamText?.value.trim()
+      if (!relicText) {
+        if (error) error.textContent = 'Write a statement for the relic.'
+        return
+      }
+      window.dispatchEvent(new CustomEvent('debug-god-ability', {
+        detail: { ability, relicText, deityName },
       }))
       this.closeGodAbilityConfirm()
       return

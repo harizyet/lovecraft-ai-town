@@ -692,6 +692,9 @@ exiles, and historical events remain intact; the refresh itself is logged.
 
 Change Weather is also available as an invocation-gated Deity ability. The user selects clear, cloudy, rain, or storm conditions; a successful intervention applies suitable temperature and hazard state immediately, delays the next natural weather transition for three simulated hours, records the divine intervention for every living villager, and consumes one invocation credit.
 
+Create Relic is another invocation-gated Deity ability. The user can type a custom text statement and specify or type a custom deity name. Once confirmed, the interface enters a map-based placement mode (indicated by a crosshair cursor and a red visual tile preview on the game canvas). Clicking a tile places down a permanent `ForbiddenRelic` at that position, consuming one invocation credit. Unbelievers of the associated deity who stumble near it will read the text, gain the knowledge as a `forbiddenKnowledge` memory, and have an immediate 80% chance of going permanently insane (triggering the `'madness'` reaction). Believers of the associated deity ignore it.
+
+
 ## Dreamscape: planted and spontaneous nightmares
 
 Dream is the quietest invocation-gated Deity ability, distinct from the overt Bless/Smite/Manifest family: rather than acting on a villager while they're awake, it reaches into the mind of a villager who is currently asleep (`activeBlocks` shows a `sleep` action with `sleepStartedAt` already set) and plants a short piece of free-text content as a dream. Only cult-unaligned villagers can be targeted — anyone with a `cult` affiliation is treated as already shielded, the same immunity language used for The Church of Christ elsewhere in the religion systems. Selecting the ability costs one invocation credit like any other.

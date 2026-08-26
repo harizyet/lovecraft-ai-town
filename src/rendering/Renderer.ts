@@ -14,6 +14,7 @@ interface RendererSimulationState {
   rumourPropagationMultiplier: number
   inventedRumourProbability: number
   rumourExtremeBeliefProbability: number
+  relicPlacementPreview?: { x: number; y: number }
 }
 
 export class Renderer {
@@ -116,6 +117,24 @@ export class Renderer {
     this.renderTiles()
     this.renderBuildings()
     this.renderCorruptionOverlay()
+    this.renderRelics()
+    if (simulation.relicPlacementPreview) {
+      const px = simulation.relicPlacementPreview.x * this.tileSize
+      const py = simulation.relicPlacementPreview.y * this.tileSize
+      const cx = px + this.tileSize / 2
+      const cy = py + this.tileSize / 2
+      const r = this.tileSize * 0.22
+      this.ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'
+      this.ctx.fillRect(px, py, this.tileSize, this.tileSize)
+      this.ctx.fillStyle = '#ff5252'
+      this.ctx.beginPath()
+      this.ctx.moveTo(cx, cy - r)
+      this.ctx.lineTo(cx + r, cy)
+      this.ctx.lineTo(cx, cy + r)
+      this.ctx.lineTo(cx - r, cy)
+      this.ctx.closePath()
+      this.ctx.fill()
+    }
     this.renderDeadBodies(agents)
     this.renderAgents(agents, simulation.rumourImpactCounts)
     this.ctx.restore()
@@ -191,6 +210,41 @@ export class Renderer {
       gradient.addColorStop(1, 'rgba(180, 190, 180, 0)')
       this.ctx.fillStyle = gradient
       this.ctx.fillRect(x - this.tileSize * 0.4, y - this.tileSize * 0.4, this.tileSize * 1.8, this.tileSize * 1.8)
+    }
+  }
+
+  // Forbidden Relics (see RelicSystem): a diamond marker at the spot an
+  // investigation was written up, glowing red if the findings contain
+  // forbidden knowledge and purple otherwise. Drawn in the same pass slot as
+  // renderCorruptionOverlay (after buildings, so it isn't painted over) but
+  // before renderDeadBodies/renderAgents so agent markers stay on top of it.
+  private renderRelics(): void {
+    for (const relic of this.world.relics.values()) {
+      const x = relic.position.x * this.tileSize
+      const y = relic.position.y * this.tileSize
+      const cx = x + this.tileSize / 2
+      const cy = y + this.tileSize / 2
+      const r = this.tileSize * 0.22
+      const forbidden = relic.containsForbiddenKnowledge
+
+      const glowRadius = r * 2.4
+      const glow = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, glowRadius)
+      glow.addColorStop(0, forbidden ? 'rgba(180, 20, 20, 0.55)' : 'rgba(130, 100, 210, 0.5)')
+      glow.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      this.ctx.fillStyle = glow
+      this.ctx.fillRect(cx - glowRadius, cy - glowRadius, glowRadius * 2, glowRadius * 2)
+
+      this.ctx.fillStyle = forbidden ? '#4a0d0d' : '#2b1a4a'
+      this.ctx.beginPath()
+      this.ctx.moveTo(cx, cy - r)
+      this.ctx.lineTo(cx + r, cy)
+      this.ctx.lineTo(cx, cy + r)
+      this.ctx.lineTo(cx - r, cy)
+      this.ctx.closePath()
+      this.ctx.fill()
+      this.ctx.strokeStyle = forbidden ? '#ff5252' : '#b39ddb'
+      this.ctx.lineWidth = 1.5
+      this.ctx.stroke()
     }
   }
 
@@ -462,7 +516,7 @@ export class Renderer {
     const padding = 15
     const lineHeight = 18
     const panelWidth = 390
-    const panelHeight = 258
+    const panelHeight = 276
     const timeStr = `${dayNight.hour.toString().padStart(2, '0')}:${Math.floor(dayNight.minute).toString().padStart(2, '0')}`
     const alive = agents.filter((a) => a.alive).length
     const dead = agents.filter((a) => !a.alive).length
@@ -512,6 +566,26 @@ export class Renderer {
       padding + 10,
       y
     )
+    y += lineHeight
+    const relics = this.computeRelicStats()
+    this.ctx.fillStyle = relics.forbidden > 0 ? '#ff5252' : relics.total > 0 ? '#b39ddb' : '#fff'
+    this.ctx.fillText(
+      relics.total > 0
+        ? `Relics: ${relics.total} left behind  |  ${relics.forbidden} forbidden`
+        : 'Relics: none left behind',
+      padding + 10,
+      y
+    )
+  }
+
+  private computeRelicStats(): { total: number; forbidden: number } {
+    let total = 0
+    let forbidden = 0
+    for (const relic of this.world.relics.values()) {
+      total++
+      if (relic.containsForbiddenKnowledge) forbidden++
+    }
+    return { total, forbidden }
   }
 
   private computeCorruptionStats(): { count: number; max: number } {

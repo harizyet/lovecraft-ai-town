@@ -58,6 +58,8 @@ export class SimulationManager {
   private weather: WeatherState
   private nextWeatherChangeMinute: number
   private selectedAgentId: string | undefined
+  private relicPlacementState: { text: string; deityName?: string } | null = null
+  private hoverTile: { x: number; y: number } | null = null
   private keys: Map<string, boolean>
 
   constructor(config: SimulationConfig) {
@@ -191,6 +193,25 @@ export class SimulationManager {
       canvas.style.cursor = 'grabbing'
     })
 
+    canvas.addEventListener('mousemove', (event) => {
+      if (this.relicPlacementState) {
+        const worldPos = this.camera.screenToWorld(
+          event.clientX,
+          event.clientY,
+          this.canvasWidth(),
+          this.canvasHeight()
+        )
+        const tileX = Math.floor(worldPos.x / this.config.tileSize)
+        const tileY = Math.floor(worldPos.y / this.config.tileSize)
+        if (tileX >= 0 && tileX < this.config.mapWidth && tileY >= 0 && tileY < this.config.mapHeight) {
+          this.hoverTile = { x: tileX, y: tileY }
+        } else {
+          this.hoverTile = null
+        }
+        canvas.style.cursor = 'crosshair'
+      }
+    })
+
     window.addEventListener('mousemove', (event) => {
       if (!dragging) return
       const dx = event.clientX - lastPointerX
@@ -209,7 +230,7 @@ export class SimulationManager {
       if (!dragging || event.button !== 0) return
       dragging = false
       suppressNextClick = dragDistance >= 3
-      canvas.style.cursor = 'grab'
+      canvas.style.cursor = this.relicPlacementState ? 'crosshair' : 'grab'
     })
 
     canvas.addEventListener('wheel', (event) => {
@@ -222,6 +243,18 @@ export class SimulationManager {
     canvas.addEventListener('click', (e) => {
       if (suppressNextClick) {
         suppressNextClick = false
+        return
+      }
+      if (this.relicPlacementState) {
+        const worldPos = this.camera.screenToWorld(
+          e.clientX,
+          e.clientY,
+          this.canvasWidth(),
+          this.canvasHeight()
+        )
+        const tileX = Math.floor(worldPos.x / this.config.tileSize)
+        const tileY = Math.floor(worldPos.y / this.config.tileSize)
+        this.placeForbiddenRelicAt(tileX, tileY)
         return
       }
       this.handleClick(e)
@@ -300,14 +333,33 @@ export class SimulationManager {
     })
 
     window.addEventListener('debug-god-ability', (event) => {
-      const detail = (event as CustomEvent<{
-        ability?: 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather'
-        targetAgentId?: string
-        weatherCondition?: WeatherCondition
-        deityName?: string
-      }>).detail
-      const result = detail?.ability && this.agentManager
-        ? this.agentManager.performGodAbility(detail.ability, detail.targetAgentId, detail.weatherCondition, detail.deityName)
+      const detail = (event as any).detail
+
+      if (detail?.ability === 'create_relic') {
+        if (!detail.relicText) {
+          window.dispatchEvent(new CustomEvent('debug-god-ability-result', {
+            detail: { success: false, message: 'Relic statement text is required.' }
+          }))
+          return
+        }
+        if (this.agentManager && this.agentManager.getGodInterventionCredits() <= 0) {
+          window.dispatchEvent(new CustomEvent('debug-god-ability-result', {
+            detail: { success: false, message: 'No worship or cult rite has invoked a deity.' }
+          }))
+          return
+        }
+        this.relicPlacementState = { text: detail.relicText, deityName: detail.deityName }
+        const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null
+        if (canvas) canvas.style.cursor = 'crosshair'
+        window.dispatchEvent(new CustomEvent('debug-god-ability-result', {
+          detail: { success: true, message: 'Relic ready. Click on the map to place it.' }
+        }))
+        this.updateDebugOverlay()
+        return
+      }
+
+      const result = detail?.ability && detail.ability !== 'create_relic' && this.agentManager
+        ? this.agentManager.performGodAbility(detail.ability as 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather', detail.targetAgentId, detail.weatherCondition, detail.deityName)
         : { success: false, message: 'Deity ability could not be performed.' }
       window.dispatchEvent(new CustomEvent('debug-god-ability-result', { detail: result }))
       this.updateDebugOverlay()
@@ -418,6 +470,18 @@ export class SimulationManager {
     window.dispatchEvent(new CustomEvent('simulation-pause-changed', {
       detail: { paused: this.paused },
     }))
+  }
+
+  private placeForbiddenRelicAt(tileX: number, tileY: number): void {
+    if (!this.relicPlacementState || !this.agentManager) return
+    const { text, deityName } = this.relicPlacementState
+    const result = this.agentManager.placeDeityForbiddenRelic(tileX, tileY, text, deityName)
+    this.relicPlacementState = null
+    this.hoverTile = null
+    const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement | null
+    if (canvas) canvas.style.cursor = 'grab'
+    window.dispatchEvent(new CustomEvent('debug-god-ability-result', { detail: result }))
+    this.updateDebugOverlay()
   }
 
   private handleClick(e: MouseEvent): void {
@@ -555,6 +619,7 @@ export class SimulationManager {
         rumourPropagationMultiplier: this.config.rumourPropagationMultiplier,
         inventedRumourProbability: this.config.inventedRumourProbability,
         rumourExtremeBeliefProbability: this.config.rumourExtremeBeliefProbability,
+        relicPlacementPreview: this.relicPlacementState ? (this.hoverTile ?? undefined) : undefined,
       })
 
       this.debugUpdateTimer += delta
@@ -845,6 +910,7 @@ export class SimulationManager {
           tiles: this.world.tiles,
           buildings: Array.from(this.world.buildings.entries()),
           objects: Array.from(this.world.objects.entries()),
+          relics: Array.from(this.world.relics.entries()),
         },
         agents: this.agentManager.createSnapshot(),
         events: this.events,
@@ -877,6 +943,7 @@ export class SimulationManager {
       this.world.tiles = saved.world.tiles
       this.world.buildings = new Map(saved.world.buildings ?? [])
       this.world.objects = new Map(saved.world.objects ?? [])
+      this.world.relics = new Map(saved.world.relics ?? [])
       const repairedBuildings = this.world.repairBuildingOverlaps()
       if (repairedBuildings > 0) {
         console.log(`[Simulation] Repositioned ${repairedBuildings} overlapping saved building${repairedBuildings === 1 ? '' : 's'}`)

@@ -1,9 +1,10 @@
-import { Tile, TileType, Building, BuildingType, Vector2 } from '@/types'
+import { Tile, TileType, Building, BuildingType, Vector2, ForbiddenRelic } from '@/types'
 
 export class World {
   public tiles: Tile[][]
   public buildings: Map<string, Building>
   public objects: Map<string, Record<string, unknown>>
+  public relics: Map<string, ForbiddenRelic>
   public width: number
   public height: number
 
@@ -13,6 +14,7 @@ export class World {
     this.tiles = []
     this.buildings = new Map()
     this.objects = new Map()
+    this.relics = new Map()
   }
 
   generate(): void {
