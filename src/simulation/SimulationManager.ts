@@ -313,6 +313,19 @@ export class SimulationManager {
       this.updateDebugOverlay()
     })
 
+    window.addEventListener('debug-plant-dream', (event) => {
+      const detail = (event as CustomEvent<{
+        targetAgentId?: string
+        biasText?: string
+        deityName?: string
+      }>).detail
+      const result = detail?.targetAgentId && detail.biasText && this.agentManager
+        ? this.agentManager.plantDream(detail.targetAgentId, detail.biasText, detail.deityName)
+        : { success: false, message: 'A dream needs both a sleeping target and some content.' }
+      window.dispatchEvent(new CustomEvent('debug-god-ability-result', { detail: result }))
+      this.updateDebugOverlay()
+    })
+
     window.addEventListener('debug-deity-chat-open', (event) => {
       const detail = (event as CustomEvent<{ targetAgentId?: string; deityName?: string }>).detail
       const result = detail?.targetAgentId && this.agentManager

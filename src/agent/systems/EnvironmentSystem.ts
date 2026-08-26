@@ -24,6 +24,18 @@ export interface EnvironmentState {
   // doesn't re-announce itself every tick while it stays corrupted.
   announcedTileKeys: Set<string>
   landCorruptedEverNarrated: boolean
+  // Consecutive simulated minutes each tile has spent at or above
+  // BLIGHT_THRESHOLD, tracked only while it's still eligible to convert
+  // (GRASS/WATER, not yet blighted). Resets the instant a tile's corruption
+  // dips back below the threshold -- Eldritch Blight requires *sustained*
+  // exposure, not merely having once peaked high.
+  sustainedHighMinutes: Map<string, number>
+  // Tiles permanently converted to BLIGHTED/BRACKISH_WATER. Kept alongside
+  // the type change itself (which is what actually persists, for free, via
+  // World.tiles) purely so advanceCorruption can skip already-blighted tiles
+  // without re-checking their tile type every minute.
+  blightedTileKeys: Set<string>
+  eldritchBlightEverNarrated: boolean
 }
 
 export function createEnvironmentState(): EnvironmentState {
@@ -32,6 +44,9 @@ export function createEnvironmentState(): EnvironmentState {
     lastTickMinute: -1,
     announcedTileKeys: new Set(),
     landCorruptedEverNarrated: false,
+    sustainedHighMinutes: new Map(),
+    blightedTileKeys: new Set(),
+    eldritchBlightEverNarrated: false,
   }
 }
 
@@ -48,6 +63,14 @@ const DEMON_INTENSITY = 1
 const RITUAL_RADIUS = 8
 const RITUAL_INTENSITY = 0.5
 const WITNESS_RADIUS = 12
+// A tile must sit at or above this corruption level, continuously, for
+// BLIGHT_SUSTAIN_MINUTES simulated minutes before it permanently converts.
+// Set below SHRINE_MAX_INTENSITY so a large, well-established shrine can
+// eventually blight its own doorstep on its own; a lone one-member shrine
+// (intensity ~0.20) never can, only a demon or an active ritual reliably
+// crosses it quickly.
+const BLIGHT_THRESHOLD = 0.4
+const BLIGHT_SUSTAIN_MINUTES = 60
 
 function tileKey(x: number, y: number): string {
   return `${x},${y}`
@@ -71,24 +94,39 @@ export class EnvironmentSystem {
   private collectSources(): CorruptionSource[] {
     const sources: CorruptionSource[] = []
 
-    for (const building of this.deps.world.buildings.values()) {
-      if (building.type !== BuildingType.CULT_SHRINE || !building.cultId) continue
+    const cultIds = new Set(
+      this.deps.getAgents()
+        .filter((agent) => agent.state.alive && agent.state.cult)
+        .map((agent) => agent.state.cult!.id)
+    )
+    for (const cultId of cultIds) {
       const memberCount = this.deps.getAgents().filter(
-        (agent) => agent.state.alive && agent.state.cult?.id === building.cultId
+        (agent) => agent.state.alive && agent.state.cult?.id === cultId
       ).length
       if (memberCount === 0) continue
+      // A corrupted Priest's congregation never builds a separate shrine --
+      // it quietly rededicates the church it already occupies (see
+      // CultSystem.completeCultShrineConstruction's cult_christian_ + CHURCH
+      // early-out). That building is its functional shrine, so it must
+      // anchor corruption the same way a genuine CULT_SHRINE building does,
+      // or a corrupted congregation would leave the world untouched.
+      const anchor = this.deps.findCultShrine(cultId) ??
+        (cultId.startsWith('cult_christian_')
+          ? Array.from(this.deps.world.buildings.values()).find((b) => b.type === BuildingType.CHURCH)
+          : undefined)
+      if (!anchor) continue
       const intensity = Math.min(
         SHRINE_MAX_INTENSITY,
         SHRINE_BASE_INTENSITY + memberCount * SHRINE_PER_MEMBER_INTENSITY
       )
       sources.push({
         kind: 'shrine',
-        x: building.position.x + building.size.x / 2,
-        y: building.position.y + building.size.y / 2,
+        x: anchor.position.x + anchor.size.x / 2,
+        y: anchor.position.y + anchor.size.y / 2,
         radius: SHRINE_BASE_RADIUS,
         intensity,
-        sourceId: building.id,
-        sourceName: building.name,
+        sourceId: anchor.id,
+        sourceName: anchor.name,
       })
     }
 
@@ -127,9 +165,14 @@ export class EnvironmentSystem {
   // Advances the corruption field by one simulated minute. Cheap to call
   // every frame: it no-ops until the absolute minute actually changes, then
   // only walks the bounding boxes of active sources plus the sparse set of
-  // already-corrupted tiles (never a full map scan).
+  // already-corrupted tiles (never a full map scan). getAbsoluteMinute()
+  // returns a continuously-advancing float (SimulationManager.updateDayNight
+  // adds a fraction of a minute every frame), not an integer minute count --
+  // floor it before comparing, or this guard almost never holds and every
+  // GROWTH_RATE/DECAY_RATE/BLIGHT_SUSTAIN_MINUTES constant below (all tuned
+  // for "once per simulated minute") instead fires on nearly every frame.
   public advanceCorruption(): void {
-    const nowMinute = this.deps.getAbsoluteMinute()
+    const nowMinute = Math.floor(this.deps.getAbsoluteMinute())
     if (nowMinute === this.state.lastTickMinute) return
     this.state.lastTickMinute = nowMinute
 
@@ -164,8 +207,11 @@ export class EnvironmentSystem {
       if (next <= REMOVE_THRESHOLD) {
         this.state.corruption.delete(key)
         this.state.announcedTileKeys.delete(key)
+        this.state.sustainedHighMinutes.delete(key)
         const { x, y } = parseTileKey(key)
         const tile = world.getTile(x, y)
+        // Only the transient tint/fog clears -- a tile already in
+        // blightedTileKeys keeps its permanently converted type regardless.
         if (tile) delete tile.corruption
       } else {
         this.state.corruption.set(key, next)
@@ -178,6 +224,78 @@ export class EnvironmentSystem {
       if (!tile) continue
       tile.corruption = value
       this.maybeAnnounce(key, x, y, value, sources)
+      this.maybeBlightTerrain(key, x, y, value, tile, sources)
+    }
+  }
+
+  // Eldritch Blight: a tile that has sat at or above BLIGHT_THRESHOLD for
+  // BLIGHT_SUSTAIN_MINUTES straight simulated minutes permanently converts
+  // -- grass into anomalous BLIGHTED ground, water into BRACKISH_WATER --
+  // rather than merely carrying a transient corruption tint. Distinct from
+  // maybeAnnounce's one-time "you notice something's wrong" flavor event:
+  // this is the deeper, irreversible consequence of long-standing shrine or
+  // demon proximity, not a first impression.
+  private maybeBlightTerrain(
+    key: string,
+    x: number,
+    y: number,
+    value: number,
+    tile: NonNullable<ReturnType<typeof this.deps.world.getTile>>,
+    sources: CorruptionSource[]
+  ): void {
+    if (this.state.blightedTileKeys.has(key)) return
+    if (tile.type !== TileType.GRASS && tile.type !== TileType.WATER) return
+
+    if (value < BLIGHT_THRESHOLD) {
+      this.state.sustainedHighMinutes.delete(key)
+      return
+    }
+
+    const sustained = (this.state.sustainedHighMinutes.get(key) ?? 0) + 1
+    if (sustained < BLIGHT_SUSTAIN_MINUTES) {
+      this.state.sustainedHighMinutes.set(key, sustained)
+      return
+    }
+
+    this.state.sustainedHighMinutes.delete(key)
+    this.state.blightedTileKeys.add(key)
+    const wasWater = tile.type === TileType.WATER
+    tile.type = wasWater ? TileType.BRACKISH_WATER : TileType.BLIGHTED
+    if (!wasWater) tile.walkable = true
+
+    let nearest: CorruptionSource | undefined
+    let nearestDist = Infinity
+    for (const source of sources) {
+      const dist = Math.hypot(source.x - x, source.y - y)
+      if (dist < nearestDist) {
+        nearestDist = dist
+        nearest = source
+      }
+    }
+
+    const description = wasWater
+      ? `The water here has festered past any hope of running clear again -- permanently brackish, seeped through by whatever ${nearest?.sourceName ?? 'unholy presence'} has lingered nearby.`
+      : `The ground here has stopped being ordinary grass -- it has taken on an anomalous, blighted character that will outlast whatever ${nearest?.sourceName ?? 'unholy presence'} caused it.`
+
+    const witnesses = this.deps.getAgents().filter(
+      (agent) => agent.state.alive && Math.hypot(agent.state.position.x - x, agent.state.position.y - y) <= WITNESS_RADIUS
+    )
+
+    const event = this.deps.eventBus.emit({
+      type: 'eldritch_blight',
+      agentId: nearest?.sourceId ?? 'world',
+      actionType: ActionType.CORRUPT,
+      outcome: wasWater ? 'terrain_brackish' : 'terrain_blighted',
+      description,
+      causationIds: [],
+      worldStateDelta: { x, y, sourceKind: nearest?.kind, sourceId: nearest?.sourceId },
+      observers: witnesses.map((witness) => witness.state.id),
+    })
+    for (const witness of witnesses) witness.addRecentMemory(event)
+
+    if (!this.state.eldritchBlightEverNarrated) {
+      this.state.eldritchBlightEverNarrated = true
+      this.deps.story.queueStoryMoment('eldritch_blight', 'Eldritch Blight', description, nearest?.sourceId ?? 'world', event.id)
     }
   }
 

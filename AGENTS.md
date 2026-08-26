@@ -3,7 +3,7 @@
 ## Overview
 A 2D simulated town where LLM-powered AI agents live, interact, make decisions, and cause real-world consequences. Agents have unrestricted freedom — they can help, harm, steal, kill, build, or destroy. All actions are logged with full causation chains.
 
-**Status**: All planned features and major extensions fully implemented (~20,950 lines of TypeScript, 36 source files, zero runtime dependencies).
+**Status**: All planned features and major extensions fully implemented (~21,200 lines of TypeScript, 38 source files, zero runtime dependencies).
 
 ## Tech Stack
 - **TypeScript 6.0 + Vite 8** — ES modules, fast dev iteration
@@ -37,6 +37,7 @@ ai-town/
 │   │       ├── [SocialSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/SocialSystem.ts)        # Encounters, conversation batching & context (430 lines)
 │   │       ├── [OutsiderSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/OutsiderSystem.ts)      # Knight/Inquisitor spawning & combat (263 lines)
 │   │       ├── [StorySystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/StorySystem.ts)         # Narrates major story moments & events (201 lines)
+│   │       ├── [EnvironmentSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/EnvironmentSystem.ts)   # Localized tile corruption from cult shrines, demons & rituals
 │   │       └── [SystemDeps.ts](file:///home/hariz/village/ai-town/src/agent/systems/SystemDeps.ts)          # Shared dependency-injection interface between systems (260 lines)
 │   ├── ai/
 │   │   ├── [AIProvider.ts](file:///home/hariz/village/ai-town/src/ai/AIProvider.ts)              # OpenAI HTTP client & prompt system (1151 lines)
@@ -93,7 +94,8 @@ main.ts
                     ├── ScheduleSystem (Daily plans, activity blocks, weather/idle handling)
                     ├── SocialSystem (Encounters, conversation batching)
                     ├── OutsiderSystem (Knight/Inquisitor spawning & combat)
-                    └── StorySystem (Chronicles major town events, alerts, and narrations)
+                    ├── StorySystem (Chronicles major town events, alerts, and narrations)
+                    └── EnvironmentSystem (Localized tile corruption from cult/demon/ritual activity)
 ```
 
 Each system is constructed once by `AgentManager` and receives a `SystemDeps` object (built
@@ -141,6 +143,9 @@ references to the other nine systems.
 | 28 | **Outsider Escalation** | `OutsiderSystem.ts` | Spawn Knights (investigating death) and Inquisitors (combating cults) |
 | 29 | **Story Narration HUD** | `StorySystem.ts`, `StoryNarrationPanel.ts` | Visual log detailing major town narrative milestones |
 | 30 | **Vocation Systems & Idle Watchdog** | `Agent.ts`, `ScheduleSystem.ts` | stuck/idle watchdog triggering `idle_recovery` behavior |
+| 31 | **Environmental Decay & Weather Corruption** | `EnvironmentSystem.ts`, `Renderer.ts` | Cult shrines/demons/rituals spread localized, reversible tile corruption: brackish water, blighted crops, persistent fog |
+| 32 | **Eldritch Blight** | `EnvironmentSystem.ts`, `types/index.ts` | Sustained high corruption permanently converts a GRASS/WATER tile's actual `TileType` into `BLIGHTED`/`BRACKISH_WATER` -- a lasting scar that outlives the corrupting source, unlike the reversible tint above |
+| 33 | **Dreamscape (planted & spontaneous nightmares)** | `ReligionSystem.ts`, `ScheduleSystem.ts`, `PromptBuilder.ts` | Deity ability plants a bias/nightmare into a sleeping, cult-unaligned villager's mind; the same villagers can also spontaneously nightmare on their own, odds scaled by town corruption and low sanity. Surfaces in reasoning and conversation, fades on next sleep |
 
 ### Partially Implemented / Simplified
 
@@ -205,8 +210,10 @@ Task completion / interaction / notable event → LLM → next task block
 }
 ```
 
-### Action Types (30 values)
-`move`, `talk`, `work`, `rest`, `attack`, `steal`, `destroy`, `help`, `flee`, `build`, `gather`, `eat`, `sleep`, `idle`, `investigate`, `interrogate`, `call_inquisitor`, `cry`, `pray`, `conjure`, `summon`, `resurrect`, `heal`, `bless`, `curse`, `ritual`, `preach`, `invite_cult`, `build_shrine`, `bribe`
+### Action Types (31 values)
+`move`, `talk`, `work`, `rest`, `attack`, `steal`, `destroy`, `help`, `flee`, `build`, `gather`, `eat`, `sleep`, `idle`, `investigate`, `interrogate`, `call_inquisitor`, `cry`, `pray`, `conjure`, `summon`, `resurrect`, `heal`, `bless`, `curse`, `ritual`, `preach`, `invite_cult`, `build_shrine`, `bribe`, `corrupt`
+
+`corrupt` is not an LLM-chosen action — it is emitted by `EnvironmentSystem` when a tile crosses the visible corruption threshold (see below), not by any agent decision.
 
 ### Emotional States (12 values)
 `happy`, `neutral`, `sad`, `angry`, `afraid`, `excited`, `tired`, `hungry`, `panicked`, `grieving`, `ambivalent`, `determined`
@@ -214,8 +221,10 @@ Task completion / interaction / notable event → LLM → next task block
 ### Relationship Types (6 values)
 `neutral`, `friend`, `enemy`, `ally`, `romantic`, `fear`
 
-### Tile Types (6 values)
-`grass`, `road`, `water`, `building`, `tree`, `path`
+### Tile Types (8 values)
+`grass`, `road`, `water`, `building`, `tree`, `path`, `blighted`, `brackish_water`
+
+`blighted` and `brackish_water` are never placed by world generation -- they only ever appear as a runtime, permanent conversion of a `grass`/`water` tile by `EnvironmentSystem`'s Eldritch Blight mechanic.
 
 ### Building Types (16 values)
 `home`, `shop`, `town_square`, `park`, `restaurant`, `church`, `workshop`, `smithy`, `carpenter_workshop`, `market`, `guardhouse`, `apothecary`, `manor`, `tavern`, `farm`, `cult_shrine`
@@ -237,9 +246,10 @@ job, emotion, path, conversation state, faith, sanity, permanentInsanity
 - Balances cost/accuracy with rich agent awareness
 
 ### World Data
-- Tile grid: 60x40, each tile has type + walkability + optional building reference
+- Tile grid: 60x40, each tile has type + walkability + optional building reference + optional `corruption` intensity (0..1, absent on untouched tiles)
 - Procedurally generated each run: water clusters, crossroads, roads, 8 buildings, scattered trees
 - Buildings placed near roads with collision checking
+- Corruption is layered on top at runtime by `EnvironmentSystem`, not part of generation
 
 ### Event Propagation
 ```
@@ -325,6 +335,20 @@ The event queues an LLM reaction for affected agents
 
 ### Outsider Subsystem (`OutsiderSystem.ts`)
 - Spawns and drives Knights (arrive after repeated deaths) and Inquisitors (arrive when a Priest confirms multiple cultists), including their patrol/pursuit/combat behavior once in the world.
+
+### Environment Subsystem (`EnvironmentSystem.ts`)
+- Ticks once per simulated minute, collecting active corruption sources — cult shrines (scaled by living membership; a corrupted Priest's congregation anchors on its rededicated church instead, since that cult never builds a separate `CULT_SHRINE`), living Demons (strongest, moves with them), and in-progress summoning rituals — and spreads a decaying 0..1 corruption value into a sparse map of nearby tiles with distance falloff.
+- Mirrors the current value directly onto `World.tiles[y][x].corruption` (rendered by `Renderer.ts` as a tint plus, past a heavier threshold, a persistent localized fog), so it persists for free through the existing tile save/load path; a small amount of bookkeeping state (which tiles have already been narrated) is snapshotted separately by `AgentManager`.
+- Fires a one-time `land_corrupted` event and Story Narration moment the first time a water tile turns brackish or a farm's crop fails; other corrupted tiles remain visually affected without their own discrete event.
+- Corruption only grows near an active source and decays back to zero once nothing sustains it, so the transient tint is a reversible, visible consequence of cult/demon activity rather than permanent world damage.
+- **Eldritch Blight**: a GRASS/WATER tile that stays at or above `BLIGHT_THRESHOLD` for `BLIGHT_SUSTAIN_MINUTES` straight simulated minutes permanently converts its actual `TileType` to `BLIGHTED`/`BRACKISH_WATER` -- this survives the transient corruption value later decaying to zero, and the first such conversion ever fires its own `eldritch_blight` Story Narration moment distinct from `land_corrupted`.
+- `advanceCorruption()` gates on `Math.floor(getAbsoluteMinute())`, not the raw value -- `SimulationManager.updateDayNight` advances simulated time as a continuously-changing float every frame, so comparing the unfloored value would make the "once per simulated minute" throttle (and therefore every rate constant tuned against it) fire on nearly every frame instead.
+
+### Dreamscape Subsystem (`ReligionSystem.ts` / `ScheduleSystem.ts`)
+- `ReligionSystem.plantDream` is an invocation-gated Deity ability that plants free-text bias into a currently-sleeping, cult-unaligned villager's mind (`AgentState.dream`); cult members are immune, mirroring the existing Church-of-Christ shielding pattern.
+- Whether it lands as an ordinary dream or a nightmare is rolled against the target's current sanity -- lower sanity raises the odds of a nightmare, which also drains extra sanity and sets fear.
+- `ScheduleSystem.rollSpontaneousNightmare` runs the instant any cult-unaligned villager starts a fresh sleep block, independent of the player: odds are driven by `AgentManager.getTownCorruptionLevel()` (a 0..1 blend of `EnvironmentSystem`'s ambient tile corruption and the cult-affiliated share of the living population) plus the same sanity weighting, capped at 15%.
+- Either source writes the same `AgentState.dream` shape; `PromptBuilder.formatDreamPersona` surfaces it explicitly in conversation prompts so the villager is nudged to bring it up unprompted, and it also reaches decision/schedule prompts naturally via the private memory event pushed alongside it. It clears automatically the next time that villager falls asleep.
 
 ### Logging
 - Every action logged: timestamp, agent, action type, target, outcome, world-state delta

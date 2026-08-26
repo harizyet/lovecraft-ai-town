@@ -245,6 +245,7 @@ export class World {
         const tile = this.tiles[y + dy][x + dx]
         if (
           tile.type === TileType.WATER ||
+          tile.type === TileType.BRACKISH_WATER ||
           tile.type === TileType.ROAD ||
           tile.type === TileType.BUILDING ||
           tile.buildingId
@@ -309,7 +310,7 @@ export class World {
     }
 
     const nameList = names[type]
-    const name = customName?.trim() || nameList[Math.floor(Math.random() * nameList.length)]
+    const name = customName?.trim() || this.pickUnusedBuildingName(nameList)
 
     return {
       id: `building_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -319,6 +320,22 @@ export class World {
       name,
       description: descriptions[type],
     }
+  }
+
+  private pickUnusedBuildingName(nameList: string[]): string {
+    const usedNames = new Set(Array.from(this.buildings.values()).map((b) => b.name))
+    const available = nameList.filter((n) => !usedNames.has(n))
+    if (available.length > 0) {
+      return available[Math.floor(Math.random() * available.length)]
+    }
+    const base = nameList[Math.floor(Math.random() * nameList.length)]
+    let suffix = 2
+    let name = `${base} ${suffix}`
+    while (usedNames.has(name)) {
+      suffix++
+      name = `${base} ${suffix}`
+    }
+    return name
   }
 
   private markBuildingTiles(

@@ -17,6 +17,7 @@ const KEY_MOMENT_LABELS: Record<StoryMomentKind, string> = {
   demon_created: 'the first ritual summoning of a bound demon',
   deity_ability_first_used: "the first time in the village's history that a deity has directly answered an invocation with this particular power -- if the facts include a transcript of the deity speaking with a villager, treat the deity's exact words and the villager's replies as sacred, terrible dialogue and weave them into the prose rather than merely summarizing that a conversation occurred",
   land_corrupted: "the moment the village's own ground first bears witness to what has been summoned or worshipped in secret -- a well gone brackish, a field's crop blackening in a single night, a fog that does not lift -- write this as the land itself keeping quiet, physical account of a sin no villager has yet confessed, noticed first by ordinary people going about ordinary chores who have no language for what they are seeing",
+  eldritch_blight: "the first patch of ground in the village's history to stop being ordinary ground entirely -- not a passing taint that might yet lift, but grass or water that has sat too long beneath a shrine's rites or a bound thing's presence and has now crossed over into something that will never again be simply grass or water, no matter what becomes of whatever corrupted it; write this as a permanent, geological fact settling into the village's landscape, the way a plague pit or a cursed grove enters local memory forever",
 }
 
 export class PromptBuilder {
@@ -112,7 +113,7 @@ Write up to ${remainingTurns} more turns continuing this conversation, alternati
     const state = agent.state
     const relationship = state.relationships.find((entry) => entry.agentId === other.state.id)
     const recent = state.memory.recent.slice(-3)
-    return `${state.name} (${state.currentJob ?? 'no job'}): personality - aggression ${state.personality.aggression.toFixed(1)}, friendliness ${state.personality.friendliness.toFixed(1)}, curiosity ${state.personality.curiosity.toFixed(1)}, caution ${state.personality.caution.toFixed(1)}. Emotional state: ${state.emotionalState}. Relationship to ${other.state.name}: ${relationship ? `${relationship.type} (${relationship.strength}/100)` : 'not personally known'}.${recent.length ? ` Recent memory: ${recent.map((e) => e.description).join('; ')}` : ''}${state.secretProphet ? ` ${state.name} is secretly the true leader of ${state.cult?.name ?? 'a hidden cult'} but must speak here as an ordinary, devout Priest and never reveal this.` : ''}${agent.isInsane() ? ` ${state.name} is insane${state.permanentInsanity ? ` (permanently, from ${state.permanentInsanity.reason})` : ' (from severe low sanity)'}: their lines should be unstable, panicked, obsessive, fearful, or erratic -- fractured thoughts, non sequiturs, paranoia, or raving -- never calm, coherent, ordinary small talk.` : this.formatExistentialPersona(state)}`
+    return `${state.name} (${state.currentJob ?? 'no job'}): personality - aggression ${state.personality.aggression.toFixed(1)}, friendliness ${state.personality.friendliness.toFixed(1)}, curiosity ${state.personality.curiosity.toFixed(1)}, caution ${state.personality.caution.toFixed(1)}. Emotional state: ${state.emotionalState}. Relationship to ${other.state.name}: ${relationship ? `${relationship.type} (${relationship.strength}/100)` : 'not personally known'}.${recent.length ? ` Recent memory: ${recent.map((e) => e.description).join('; ')}` : ''}${state.secretProphet ? ` ${state.name} is secretly the true leader of ${state.cult?.name ?? 'a hidden cult'} but must speak here as an ordinary, devout Priest and never reveal this.` : ''}${agent.isInsane() ? ` ${state.name} is insane${state.permanentInsanity ? ` (permanently, from ${state.permanentInsanity.reason})` : ' (from severe low sanity)'}: their lines should be unstable, panicked, obsessive, fearful, or erratic -- fractured thoughts, non sequiturs, paranoia, or raving -- never calm, coherent, ordinary small talk.` : this.formatExistentialPersona(state)}${this.formatDreamPersona(state)}`
   }
 
   private formatExistentialPersona(state: AgentState): string {
@@ -129,6 +130,13 @@ Write up to ${remainingTurns} more turns continuing this conversation, alternati
       return ` ${state.name} privately knows an unsettling truth about their reality and has made peace with it; they remain calm and ordinary, only growing wistful or oddly philosophical if pressed on deep questions.`
     }
     return ''
+  }
+
+  private formatDreamPersona(state: AgentState): string {
+    if (!state.dream) return ''
+    return state.dream.isNightmare
+      ? ` ${state.name} had a vivid, disturbing nightmare last night: "${state.dream.biasText}" It has visibly shaken them, and they are likely to bring it up unprompted, dwelling on it with dread or asking others if they have felt anything similar.`
+      : ` ${state.name} had a strange, vivid dream last night: "${state.dream.biasText}" It has stuck with them, and they may mention it in conversation as an odd thing that happened, colouring their opinions or suspicions even if they cannot say why.`
   }
 
   private formatExistentialSchedule(state: AgentState): string {

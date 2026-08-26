@@ -98,6 +98,11 @@ export interface SystemDeps {
 
   getAbsoluteMinute(): number
   getMinuteOfDay(): number
+  // 0..1 blend of ambient environmental corruption (EnvironmentSystem's
+  // tile corruption field) and how much of the living population belongs to
+  // a cult. Drives the odds that a cult-unaligned sleeper spontaneously has
+  // a nightmare (see ScheduleSystem).
+  getTownCorruptionLevel(): number
 
   // Court and the policy assembly cannot run at the same time; each needs to
   // know whether the other currently has the floor.

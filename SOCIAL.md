@@ -178,6 +178,66 @@ resolves through the same comprehension/reaction system described below.
 A targeted divine `manifest` against a living villager, and every witness of a
 resurrection, route through that same system rather than a flat coin flip.
 
+## Environmental decay & weather corruption
+
+The world itself is not immune to the village's spiritual corruption. Three
+sources bleed a localized corruption value into nearby tiles: a cult's shrine
+(scaled by how many living members it has), a bound Demon (moving with it, and
+by far the strongest source), and the site of an active summoning ritual while
+it is underway. A corrupted Priest's congregation counts here too even though
+it never raises a separate shrine building (see "A corrupted Priest" above):
+its rededicated church stands in as the shrine, so the flock's presence taints
+the ground around it exactly as an ordinary cult's shrine would. Corruption
+spreads with distance falloff from each source,
+ramping up gradually over real simulated minutes rather than appearing
+instantly, and it is capped by the strength of whatever is causing it — a
+small, thinly attended shrine only ever taints its immediate surroundings,
+while a Demon's presence can blight a much wider area.
+
+Crossing a visible threshold has two distinct, tile-type-specific consequences,
+each narrated only the first time it happens to a given tile:
+
+- A **water tile** turns brackish and foul-smelling.
+- A **farm building**'s fields blacken and the crop fails where it stands.
+
+Every other affected tile still visibly carries the corruption — rendered with
+a sickly tint and, past a heavier threshold, a persistent, localized fog that
+does not lift — without generating its own discrete narrative event, so the
+overall effect reads as spreading ambient dread rather than a wall of
+repeated announcements. Any living villager near a tile when it first crosses
+the visible threshold witnesses it and receives the memory. The very first
+time any tile is corrupted in a given village, the moment is chronicled through
+the same Story Narration system used for cult foundings and demonic summons.
+
+Corruption is reversible: it only continues to grow within an active source's
+radius, and decays back toward zero once nothing sustains it there — a
+disbanded cult's shrine losing its congregation, or a Demon moving elsewhere
+or being removed, lets the tainted ground gradually heal. This is distinct
+from the global weather system (clear/cloudy/rain/storm), which is ambient and
+untied to any in-world cause; corruption is always the localized, visible
+fingerprint of a specific cult, Demon, or ritual.
+
+### Eldritch Blight
+
+A tile's corruption value on its own is only ever a transient tint: it heals
+once whatever is sustaining it goes away. Eldritch Blight is the deeper,
+irreversible consequence of letting a tile sit at meaningfully high corruption
+for a sustained stretch of simulated time (continuously, not merely having
+once peaked there) — a grass tile permanently becomes anomalous, blighted
+ground, and a water tile permanently becomes brackish water. Neither ever
+reverts to ordinary grass or clear water again, even long after the shrine,
+Demon, or ritual responsible is gone and the tile's own transient corruption
+has fully faded back to nothing. A demon's presence or an active summoning
+site cross the sustained threshold quickly; a lone, sparsely attended shrine
+never generates enough intensity on its own to blight anything, while a
+large, well-established one eventually can. The very first blight conversion
+in a village's history is chronicled through the Story Narration system, the
+same way a cult's founding or a Demon's summoning is; every individual
+conversion afterward is still recorded as an ordinary witnessed event, just
+without its own narrated moment. Blighted ground no longer yields herbs to
+`gather` the way ordinary grass does — one of the ways the change is a
+genuine mechanical consequence, not only a visual one.
+
 ## Existential reactions to forbidden knowledge
 
 Learning something that undermines a villager's basic understanding of their
@@ -337,6 +397,10 @@ A freshly generated village's Priest already founds and leads a small, establish
 Succeeding secretly makes the Priest the true Prophet and cult leader while their public `currentJob` deliberately stays `Priest` — the corrupted-Priest twist this represents (worn openly, à la Lovecraft's Innsmouth) is that nothing about their outward station changes. Moments later, the congregation they already founded is quietly refounded under a new, LLM-generated name evoking something ancient, oceanic, and inhuman; every existing member's own cult record updates to the new name too, since cult membership is stored per-agent rather than by reference, and the corrupted Priest's role advances from founder to leader like any other cult founding. The renaming and appointment are both private: visible only in the global event log and the corrupted Priest's own memory, exactly like an ordinary Prophet appointment.
 
 A corrupted Priest keeps performing ordinary Priest duties as cover — services, counsel, investigation of unrelated allegations — and is deliberately excluded from ever earnestly investigating, interrogating, or calling an Inquisitor against their own true cult or its members. They are also exempt from the daily public prophetic-claim habit and from the vocation rule that strips an ordinary Prophet of all secular work, so their schedule continues to read as a normal Priest's. Existing mechanics that treat cult leadership generically — preaching in place of secular work, summoning, shrine construction reusing the existing church building, voting-bloc behavior in court, and suspicion of a member who defects from "their own flock" — continue to apply unchanged, since none of them depend on the public job title.
+
+Corruption cuts everyone's actual belief in Christ heavily, the Priest included — his own confidence in Christ takes the same steep hit as the flock's, since he is the one who first submitted to the whisper. Every member of the congregation (Priest and flock alike) has their named Christ deity confidence dropped by 65 points, floored at 0, while their confidence in the corrupting deity rises. None of this is visible to the congregants themselves or announced publicly: each still consciously believes they worship Christ as devoutly as ever, per the `flock_corrupted` narration — the drop is a private internal fact rather than a witnessed event, exactly like the rest of the corruption twist.
+
+The debug GUI, however, is not bound by that in-fiction secrecy — it is meant to show a corrupted Priest's true worldview, faith, and deity confidences plainly, the same as it does for any other agent. (A freshly generated village's founding Priest or congregant can occasionally be the same agent randomly chosen as the village's initial atheist before their Christian belief is seeded over it; `seedInitialChristianCult` now explicitly clears that agent's hidden-worldview flag when it overwrites their stance, and the debug GUI additionally only ever treats a worldview as "undisclosed" when the agent's actual stance is `atheist` or `nonbeliever` — an overt believer, corrupted or not, is never displayed as hidden.)
 
 ### Cult shrines
 
@@ -584,6 +648,8 @@ The Prophet role replaces secular employment rather than coexisting with it. Onc
 
 A cult leader can choose the `invite_cult` action with an unaffiliated living villager as the target. The leader travels into conversational range and makes the invitation personally; if the target moves away, the leader continues approaching rather than recruiting remotely. Acceptance is not automatic. It is influenced by the leader's friendliness and faith, the relationship between both villagers, and the invitee's curiosity and caution. Acceptance adds the invitee as a cult member, while rejection leaves them unaffiliated. Both results are recorded in the participants' memories and event history. Ordinary cult members cannot issue membership invitations.
 
+Every path into becoming a believer or cult member — direct invitation, accumulated preaching progress, an undecided listener spontaneously resolving their worldview, or willingly seeking out a leader after a divine conversation — also seeds a named deity belief for the new believer, keyed to whichever deity their leader/preacher is understood to worship (the same name-resolution logic Deity abilities use). A first-time convert starts at 50% confidence; an existing belief in that same deity is instead raised to at least 50%. Without this, a newly converted villager would carry an empty deity-beliefs list forever despite being a committed member of a cult devoted to a specific god.
+
 Nearby unaffiliated believers and undecided villagers accumulate persistent, per-cult conversion progress whenever they listen to preaching. Repeated sermons eventually convert them into members. Established nonbelievers and atheists never gain preaching progress and always refuse direct cult invitations.
 
 Conversion immunity applies to every social conversion pathway. Nonbelievers and atheists cannot be converted by ordinary faith appeals, cannot receive automatically inserted conversion dialogue, cannot accumulate cult-conversion progress, and cannot accept cult recruitment. Any stale progress on an immune agent is cleared during simulation updates. Undecided villagers remain eligible to choose a worldview.
@@ -625,5 +691,15 @@ relationships, cult state, memories, rumours, buildings, resources, deaths,
 exiles, and historical events remain intact; the refresh itself is logged.
 
 Change Weather is also available as an invocation-gated Deity ability. The user selects clear, cloudy, rain, or storm conditions; a successful intervention applies suitable temperature and hazard state immediately, delays the next natural weather transition for three simulated hours, records the divine intervention for every living villager, and consumes one invocation credit.
+
+## Dreamscape: planted and spontaneous nightmares
+
+Dream is the quietest invocation-gated Deity ability, distinct from the overt Bless/Smite/Manifest family: rather than acting on a villager while they're awake, it reaches into the mind of a villager who is currently asleep (`activeBlocks` shows a `sleep` action with `sleepStartedAt` already set) and plants a short piece of free-text content as a dream. Only cult-unaligned villagers can be targeted — anyone with a `cult` affiliation is treated as already shielded, the same immunity language used for The Church of Christ elsewhere in the religion systems. Selecting the ability costs one invocation credit like any other.
+
+Whether the planted content lands as an ordinary dream or curdles into a nightmare is a roll weighted against the target's current sanity: the frailer their sanity already is, the likelier it turns into a nightmare. A nightmare additionally drains 5-15 more sanity on the spot and sets the target's emotional state to afraid; an ordinary dream leaves sanity untouched. Either way the content is recorded as a private memory, colors the target's own internal reasoning the next time they act, and is surfaced explicitly to the conversation system — a dreaming villager is nudged to bring the dream up unprompted with whoever they next talk to, discussing it more insistently and fearfully if it turned into a nightmare.
+
+Independent of any player action, cult-unaligned villagers can also have a nightmare arise on their own the instant they fall asleep. The odds scale with a 0-1 "town corruption level" — a blend of the ambient environmental corruption tracked by `EnvironmentSystem` (ambient tile corruption from nearby shrines, demons, and summoning rites) and the fraction of the living population that currently belongs to a cult — combined with the same sanity weighting used for planted nightmares, capped at a 15% chance per sleep. A spontaneous nightmare draws from a small pool of Lovecraftian flavor lines (something vast stirring underground, neighbors' faces going wrong, a voice chanting words that hurt to remember, and similar), drains a smaller 3-10 sanity, and is otherwise indistinguishable from a player-planted one once it lands — same fear response, same private memory, same pressure to surface it in the next conversation. In effect, the more corrupted and cult-ridden the town becomes, the more its ordinary, unaffiliated residents start losing sleep over things they can't explain.
+
+Either kind of dream is temporary: it persists through the villager's following waking hours (and is visible in the Agent States detail popup, tagged by source — "player" or "spontaneous") but is cleared automatically the next time that villager falls asleep again, whether or not a new one replaces it.
 
 Believers include an explicit `pray` block in each remaining daily schedule. The planning prompt requests it naturally, and schedule validation repairs an omitted prayer by splitting a suitable work, rest, talk, or idle block without creating an overlap; if necessary it appends a short prayer before the end of the day. Prayer is available to believers outside cults as well as cult members, and worship directed toward any deity held with meaningful confidence — not only God — qualifies for a deity-intervention credit.

@@ -933,6 +933,24 @@ export class CultSystem {
     })
   }
 
+  // Every ordinary way to join a cult (devotion, invitation, preaching)
+  // sets religiousStance/faith but previously never touched the joiner's
+  // named deity beliefs, leaving them permanently showing "Deity beliefs:
+  // none" in the debug GUI even as a committed member of a cult devoted to
+  // a specific deity. Mirrors the confidence seeding ReligionSystem already
+  // does for the founding Church of Christ congregation and its corruption.
+  private seedMemberDeityBelief(member: Agent, leader: Agent): void {
+    const deityName = this.deps.chooseDeityName(leader)
+    let deity = member.state.beliefSystem.deities.find((candidate) => candidate.name === deityName)
+    if (!deity) {
+      deity = { name: deityName, confidence: 50, revelationCount: 1 }
+      member.state.beliefSystem.deities.push(deity)
+    } else {
+      deity.confidence = Math.max(50, deity.confidence)
+      deity.revelationCount++
+    }
+  }
+
   public completeWillingCultJoin(agent: Agent, leader: Agent): void {
     const cult = leader.state.cult
     const seeking = agent.state.seekingCultJoin
@@ -954,6 +972,7 @@ export class CultSystem {
     agent.state.antiCultGroup = undefined
     agent.state.beliefSystem.religiousStance = 'believer'
     agent.state.beliefSystem.faith = Math.max(40, agent.state.beliefSystem.faith)
+    this.seedMemberDeityBelief(agent, leader)
     if (agent.state.cultConversionProgress) delete agent.state.cultConversionProgress[cult.id]
     agent.state.seekingCultJoin = undefined
 
@@ -1041,6 +1060,7 @@ export class CultSystem {
       target.state.antiCultGroup = undefined
       target.state.beliefSystem.religiousStance = 'believer'
       target.state.beliefSystem.faith = Math.max(30, target.state.beliefSystem.faith)
+      this.seedMemberDeityBelief(target, prophet)
       if (target.state.cultConversionProgress) delete target.state.cultConversionProgress[cult.id]
     }
     const event = this.deps.eventBus.emit({
@@ -1920,6 +1940,7 @@ export class CultSystem {
         listener.state.antiCultGroup = undefined
         listener.state.beliefSystem.religiousStance = 'believer'
         listener.state.beliefSystem.faith = Math.max(30, listener.state.beliefSystem.faith)
+        this.seedMemberDeityBelief(listener, preacher)
         delete listener.state.cultConversionProgress[cult.id]
       }
       const worldviewDecision = !joined
@@ -2006,6 +2027,7 @@ export class CultSystem {
     listener.state.beliefSystem.religiousStance = stance
     if (stance === 'believer') {
       listener.state.beliefSystem.faith = Math.max(25, listener.state.beliefSystem.faith)
+      this.seedMemberDeityBelief(listener, preacher)
     } else {
       delete listener.state.cultConversionProgress?.[cultId]
     }

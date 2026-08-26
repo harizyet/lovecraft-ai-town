@@ -49,6 +49,11 @@ export class Renderer {
       [TileType.BUILDING]: '#c4a882',
       [TileType.TREE]: '#2d5a27',
       [TileType.PATH]: '#a0896c',
+      // Permanent EnvironmentSystem terrain scars -- these are the tile's
+      // actual base color, not a transient overlay, since the conversion is
+      // irreversible even once corruption itself decays away.
+      [TileType.BLIGHTED]: '#4a3b52',
+      [TileType.BRACKISH_WATER]: '#4f5330',
     }
 
     this.buildingColors = {
@@ -110,6 +115,7 @@ export class Renderer {
     this.applyCamera()
     this.renderTiles()
     this.renderBuildings()
+    this.renderCorruptionOverlay()
     this.renderDeadBodies(agents)
     this.renderAgents(agents, simulation.rumourImpactCounts)
     this.ctx.restore()
@@ -142,10 +148,6 @@ export class Renderer {
         this.ctx.fillStyle = this.tileColors[tile.type]
         this.ctx.fillRect(screenX, screenY, this.tileSize, this.tileSize)
 
-        if (tile.corruption) {
-          this.renderCorruption(screenX, screenY, tile.type, tile.corruption)
-        }
-
         if (tile.type === TileType.TREE) {
           this.renderTree(screenX, screenY)
         }
@@ -157,10 +159,26 @@ export class Renderer {
   // rituals (see EnvironmentSystem): water is tinted brackish, other tiles
   // are tinted a sickly blight, and past a heavier threshold a translucent
   // fog patch is layered on top -- a persistent, localized haze rather than
-  // the ambient, global weather overlay.
+  // the ambient, global weather overlay. Drawn as its own pass *after*
+  // renderBuildings(), not folded into renderTiles(): a building's solid
+  // fill rect is painted directly over its footprint's tiles, so a tint
+  // applied during the base tile pass (e.g. on a blighted farm or a cult's
+  // own shrine tile) would be invisibly painted over and never actually
+  // seen.
+  private renderCorruptionOverlay(): void {
+    for (let y = 0; y < this.world.height; y++) {
+      for (let x = 0; x < this.world.width; x++) {
+        const tile = this.world.getTile(x, y)
+        if (!tile?.corruption) continue
+        this.renderCorruption(x * this.tileSize, y * this.tileSize, tile.type, tile.corruption)
+      }
+    }
+  }
+
   private renderCorruption(x: number, y: number, tileType: TileType, intensity: number): void {
-    const alpha = Math.min(0.85, intensity)
-    const tint = tileType === TileType.WATER ? `rgba(70, 74, 38, ${alpha})` : `rgba(84, 46, 94, ${alpha * 0.6})`
+    const alpha = Math.min(0.85, 0.15 + intensity * 0.7)
+    const isWaterLike = tileType === TileType.WATER || tileType === TileType.BRACKISH_WATER
+    const tint = isWaterLike ? `rgba(70, 74, 38, ${alpha})` : `rgba(84, 46, 94, ${alpha * 0.75})`
     this.ctx.fillStyle = tint
     this.ctx.fillRect(x, y, this.tileSize, this.tileSize)
 

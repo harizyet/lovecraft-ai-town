@@ -28,6 +28,14 @@ export enum TileType {
   BUILDING = 'building',
   TREE = 'tree',
   PATH = 'path',
+  // Permanent scars left by sustained EnvironmentSystem corruption: a grass
+  // tile that stayed heavily corrupted long enough becomes anomalous ground
+  // that never reverts to ordinary grass, even after the corrupting source
+  // is gone and the tile's transient corruption value has fully decayed.
+  BLIGHTED = 'blighted',
+  // The water equivalent -- a lake or pond tile that has been permanently
+  // fouled rather than merely tinted while corruption is active.
+  BRACKISH_WATER = 'brackish_water',
 }
 
 export enum BuildingType {
@@ -447,7 +455,7 @@ export interface Rumour {
   timelineSummary?: string
 }
 
-export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted'
+export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight'
 
 export interface StoryMoment {
   id: string
@@ -606,6 +614,19 @@ export interface AgentState {
     causedAtMinute: number
     source: 'divine_manifestation' | 'demon_manifestation' | 'forbidden_knowledge'
     reason: string
+  }
+  // A bias or nightmare either planted by the player while this agent slept
+  // (ReligionSystem.plantDream) or arising on its own from the town's
+  // ambient corruption (ScheduleSystem's spontaneous nightmare roll, cult-
+  // unaligned agents only). Cleared the next time the agent falls asleep
+  // (see ScheduleSystem), so it colors roughly one waking day of behaviour
+  // and conversation before fading.
+  dream?: {
+    plantedBy: 'player' | 'spontaneous'
+    deityName?: string
+    biasText: string
+    isNightmare: boolean
+    plantedAtMinute: number
   }
   lastDeath?: {
     witnessIds: string[]

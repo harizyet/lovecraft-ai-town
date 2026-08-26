@@ -130,6 +130,7 @@ export class AgentManager {
 
       getAbsoluteMinute: () => this.getAbsoluteMinute(),
       getMinuteOfDay: () => this.getMinuteOfDay(),
+      getTownCorruptionLevel: () => this.getTownCorruptionLevel(),
 
       runLLMRequestWithRetry: (agentId, label, request, maxAttempts) =>
         this.runLLMRequestWithRetry(agentId, label, request, maxAttempts),
@@ -396,6 +397,9 @@ export class AgentManager {
       environmentCorruption: Array.from(this.environmentSystem.state.corruption.entries()),
       environmentAnnouncedTileKeys: Array.from(this.environmentSystem.state.announcedTileKeys),
       environmentLandCorruptedEverNarrated: this.environmentSystem.state.landCorruptedEverNarrated,
+      environmentSustainedHighMinutes: Array.from(this.environmentSystem.state.sustainedHighMinutes.entries()),
+      environmentBlightedTileKeys: Array.from(this.environmentSystem.state.blightedTileKeys),
+      environmentEldritchBlightEverNarrated: this.environmentSystem.state.eldritchBlightEverNarrated,
     }
   }
 
@@ -455,6 +459,9 @@ export class AgentManager {
     this.environmentSystem.state.corruption = new Map(snapshot.environmentCorruption ?? [])
     this.environmentSystem.state.announcedTileKeys = new Set(snapshot.environmentAnnouncedTileKeys ?? [])
     this.environmentSystem.state.landCorruptedEverNarrated = snapshot.environmentLandCorruptedEverNarrated ?? false
+    this.environmentSystem.state.sustainedHighMinutes = new Map(snapshot.environmentSustainedHighMinutes ?? [])
+    this.environmentSystem.state.blightedTileKeys = new Set(snapshot.environmentBlightedTileKeys ?? [])
+    this.environmentSystem.state.eldritchBlightEverNarrated = snapshot.environmentEldritchBlightEverNarrated ?? false
     while (this.religionSystem.state.demonSummonSites.length < this.religionSystem.state.demonSummonCredits) {
       this.religionSystem.state.demonSummonSites.push(this.findTownEntrance())
     }
@@ -674,6 +681,14 @@ export class AgentManager {
     return this.religionSystem.performGodAbility(ability, targetAgentId, weatherCondition, deityNameOverride)
   }
 
+  public plantDream(
+    targetAgentId: string,
+    biasText: string,
+    deityNameOverride?: string
+  ): { success: boolean; message: string } {
+    return this.religionSystem.plantDream(targetAgentId, biasText, deityNameOverride)
+  }
+
   public beginDeityConversation(
     targetAgentId: string,
     deityNameOverride?: string
@@ -794,6 +809,18 @@ export class AgentManager {
 
   private getAbsoluteMinute(): number {
     return this.scheduleSystem.getAbsoluteMinute()
+  }
+
+  private getTownCorruptionLevel(): number {
+    const tileCorruptionValues = Array.from(this.environmentSystem.state.corruption.values())
+    const avgTileCorruption = tileCorruptionValues.length > 0
+      ? tileCorruptionValues.reduce((sum, value) => sum + value, 0) / tileCorruptionValues.length
+      : 0
+    const livingAgents = this.agents.filter((agent) => agent.state.alive)
+    const cultFraction = livingAgents.length > 0
+      ? livingAgents.filter((agent) => agent.state.cult).length / livingAgents.length
+      : 0
+    return Math.min(1, avgTileCorruption * 0.6 + cultFraction * 0.4)
   }
 
 

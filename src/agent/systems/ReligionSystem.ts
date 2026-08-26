@@ -473,6 +473,78 @@ export class ReligionSystem {
     return { success: true, message: `${description} ${this.state.godInterventionCredits} invocation${this.state.godInterventionCredits === 1 ? '' : 's'} remain.` }
   }
 
+  // A quieter, more Lovecraftian divine ability than performGodAbility's
+  // overt bless/smite/manifest: reaches into a sleeping, cult-unaligned
+  // villager's mind and plants a bias as a dream. Agents with weaker sanity
+  // are more likely to have it curdle into a nightmare, which frays their
+  // sanity further and leaves them visibly shaken; sturdier minds are more
+  // likely to just carry the bias as an odd, lingering impression. Either
+  // way it surfaces the next day in the villager's own reasoning and
+  // conversation (see PromptBuilder), then fades once they next fall asleep.
+  public plantDream(
+    targetAgentId: string,
+    biasText: string,
+    deityNameOverride?: string
+  ): { success: boolean; message: string } {
+    if (this.state.godInterventionCredits <= 0) {
+      return { success: false, message: 'No worship or cult rite has invoked a deity.' }
+    }
+    const trimmedBias = biasText.trim()
+    if (!trimmedBias) return { success: false, message: 'The dream needs some content to plant.' }
+    const target = this.deps.getAgents().find((agent) => agent.state.id === targetAgentId)
+    if (!target || !target.state.alive) return { success: false, message: 'Select a living villager.' }
+    const active = this.deps.activeBlocks.get(target.state.id)
+    if (active?.action.action !== 'sleep' || active.sleepStartedAt === undefined) {
+      return { success: false, message: `${target.state.name} must be asleep to receive a planted dream.` }
+    }
+    if (target.state.cult) {
+      return { success: false, message: `${target.state.name} already serves ${target.state.cult.name}; their dreams are shielded from outside influence.` }
+    }
+
+    const deityName = deityNameOverride?.trim() || this.state.lastInvokedDeityName || this.chooseDeityName(target)
+    const previousSanity = target.state.sanity
+    const nightmareChance = Math.max(10, 100 - previousSanity)
+    const isNightmare = Math.random() * 100 < nightmareChance
+    if (isNightmare) {
+      target.state.sanity = Math.max(0, previousSanity - (5 + Math.round(Math.random() * 10)))
+      target.state.emotionalState = EmotionalState.AFRAID
+      target.state.lastReasoning = `I dreamed something terrible: "${trimmedBias}" I woke shaking, and I cannot shake the feeling it was true.`
+    } else {
+      target.state.lastReasoning = `I dreamed something strange: "${trimmedBias}" It lingers in my mind like it means something.`
+    }
+    target.state.dream = {
+      plantedBy: 'player',
+      deityName,
+      biasText: trimmedBias,
+      isNightmare,
+      plantedAtMinute: this.deps.getAbsoluteMinute(),
+    }
+
+    this.state.godInterventionCredits--
+    const description = isNightmare
+      ? `${deityName} reached into ${target.state.name}'s sleeping mind and curdled a planted dream into a nightmare: "${trimmedBias}" Their sanity fell from ${previousSanity.toFixed(0)} to ${target.state.sanity.toFixed(0)}.`
+      : `${deityName} reached into ${target.state.name}'s sleeping mind and planted a dream: "${trimmedBias}"`
+    const event = this.deps.eventBus.emit({
+      type: 'dream_planted',
+      agentId: 'world',
+      targetId: target.state.id,
+      actionType: ActionType.IDLE,
+      outcome: isNightmare ? 'nightmare' : 'dream',
+      description,
+      causationIds: [],
+      worldStateDelta: {
+        deityName,
+        targetAgentId: target.state.id,
+        isNightmare,
+        biasText: trimmedBias,
+        remainingCredits: this.state.godInterventionCredits,
+      },
+      observers: [target.state.id],
+    })
+    target.addRecentMemory(event)
+    return { success: true, message: `${description} ${this.state.godInterventionCredits} invocation${this.state.godInterventionCredits === 1 ? '' : 's'} remain.` }
+  }
+
   public applyResurrectionInsanity(
     target: Agent,
     sourceName: string,
@@ -696,6 +768,12 @@ export class ReligionSystem {
       } else {
         deity.confidence = Math.max(75, deity.confidence)
       }
+      // If this founding member happened to be picked as the village's
+      // initial atheist (chosen purely by lowest starting faith, regardless
+      // of job) before this seeding overwrote their worldview, their reveal
+      // flag would otherwise stay stuck at false forever, permanently
+      // hiding an overtly devout Church founder's beliefs in the debug GUI.
+      agent.state.religiousStanceRevealed = true
     }
 
     priest.state.cult = cult
@@ -1265,10 +1343,12 @@ export class ReligionSystem {
     for (const member of this.deps.getAgents()) {
       if (member.state.cult?.id !== cult.id) continue
       member.state.cult.name = newName
-      if (member.state.id === priest.state.id) continue
-      corruptedFlock.push(member)
+      // The priest submitted first and is corrupted no less than the flock
+      // that followed him, so his own belief in Christ takes the same heavy
+      // hit -- only the "still an ordinary congregant" bookkeeping below is
+      // priest-specific.
       const christDeity = member.state.beliefSystem.deities.find((candidate) => /^christ$/i.test(candidate.name))
-      if (christDeity) christDeity.confidence = Math.max(0, christDeity.confidence - 30)
+      if (christDeity) christDeity.confidence = Math.max(0, christDeity.confidence - 65)
       let corruptedDeity = member.state.beliefSystem.deities.find((candidate) => candidate.name === deityName)
       if (!corruptedDeity) {
         corruptedDeity = { name: deityName, confidence: 35, revelationCount: 0 }
@@ -1277,6 +1357,8 @@ export class ReligionSystem {
         corruptedDeity.confidence = Math.min(100, corruptedDeity.confidence + 20)
       }
       corruptedDeity.revelationCount++
+      if (member.state.id === priest.state.id) continue
+      corruptedFlock.push(member)
     }
     cult.role = 'leader'
     priest.state.cultAgendas = this.deps.createCultLeaderAgendas(priest)

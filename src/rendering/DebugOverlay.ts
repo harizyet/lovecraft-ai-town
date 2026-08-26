@@ -16,7 +16,7 @@ export class DebugOverlay {
   private rumourTrackerPanel: HTMLDivElement
   private controlsPanel: HTMLDivElement
   private godAbilityConfirmPanel: HTMLDivElement
-  private pendingGodAbility: 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather' | 'speak' | null
+  private pendingGodAbility: 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather' | 'speak' | 'dream' | null
   private agentDetailsPanel: HTMLDivElement
   private cultTrackerPanel: HTMLDivElement
   private cultDetailsPanel: HTMLDivElement
@@ -232,7 +232,7 @@ export class DebugOverlay {
         <div id="god-abilities-content" style="display:none;">
           <div id="god-invocation-source" style="max-width:420px;margin:3px 0 6px;color:#9e8f67;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Waiting for worship directed toward a deity.</div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            ${['bless', 'heal', 'smite', 'resurrect', 'manifest', 'weather', 'speak'].map((ability) => `<button data-god-ability="${ability}" disabled style="padding:4px 8px;border:0;border-radius:3px;background:#51482d;color:#8d8469;cursor:not-allowed;text-transform:capitalize;">${ability}</button>`).join('')}
+            ${['bless', 'heal', 'smite', 'resurrect', 'manifest', 'weather', 'speak', 'dream'].map((ability) => `<button data-god-ability="${ability}" disabled style="padding:4px 8px;border:0;border-radius:3px;background:#51482d;color:#8d8469;cursor:not-allowed;text-transform:capitalize;">${ability}</button>`).join('')}
           </div>
           <div id="god-ability-status" style="min-height:14px;margin-top:4px;color:#9e9e9e;font-size:10px;"></div>
         </div>
@@ -473,6 +473,11 @@ export class DebugOverlay {
             <option value="storm">Storm</option>
           </select>
         </div>
+        <div id="god-ability-confirm-dream-row" style="margin-bottom:9px;display:none;">
+          <label for="god-ability-confirm-dream" style="display:block;color:#e8d5a8;margin-bottom:3px;">Bias to plant (only sleeping, cult-unaligned villagers)</label>
+          <textarea id="god-ability-confirm-dream" maxlength="240" rows="3" placeholder="e.g. The well water is poisoned. Trust no one wearing red." style="box-sizing:border-box;width:100%;padding:5px;background:#282216;color:#fff;border:1px solid #6d5d32;border-radius:3px;font:inherit;resize:vertical;"></textarea>
+          <div style="color:#9e9e9e;font-size:10px;margin-top:3px;">Lower sanity raises the odds this curdles into a nightmare instead of an ordinary dream.</div>
+        </div>
         <div id="god-ability-confirm-error" style="min-height:14px;color:#ef9a9a;margin-bottom:4px;"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px;">
           <button id="god-ability-confirm-cancel" style="padding:6px 12px;border:0;border-radius:4px;background:#555;color:#fff;cursor:pointer;font:inherit;">Cancel</button>
@@ -504,25 +509,32 @@ export class DebugOverlay {
     const deitySelect = panel.querySelector<HTMLSelectElement>('#god-ability-confirm-deity')
     const deityCustom = panel.querySelector<HTMLInputElement>('#god-ability-confirm-deity-custom')
     const weatherRow = panel.querySelector<HTMLElement>('#god-ability-confirm-weather-row')
+    const dreamRow = panel.querySelector<HTMLElement>('#god-ability-confirm-dream-row')
+    const dreamText = panel.querySelector<HTMLTextAreaElement>('#god-ability-confirm-dream')
     const error = panel.querySelector<HTMLElement>('#god-ability-confirm-error')
-    if (!title || !targetRow || !targetSelect || !deityRow || !deitySelect || !deityCustom || !weatherRow || !error) return
+    if (!title || !targetRow || !targetSelect || !deityRow || !deitySelect || !deityCustom || !weatherRow || !dreamRow || !dreamText || !error) return
 
     if (title) title.textContent = `Confirm: ${ability.charAt(0).toUpperCase()}${ability.slice(1)}`
     if (error) error.textContent = ''
     deityCustom.value = ''
+    dreamText.value = ''
 
     const needsTarget = ability !== 'weather'
     targetRow.style.display = needsTarget ? 'block' : 'none'
     if (needsTarget) {
       const eligible = ability === 'resurrect'
         ? this.latestAgents.filter((agent) => !agent.alive)
-        : this.latestAgents.filter((agent) => agent.alive)
+        : ability === 'dream'
+          ? this.latestAgents.filter((agent) => agent.alive && !agent.cult && this.latestActivityStatuses[agent.id] === 'sleeping')
+          : this.latestAgents.filter((agent) => agent.alive)
       const options = eligible.map((agent) =>
         `<option value="${this.escapeHtml(agent.id)}">${this.escapeHtml(agent.name)} (${agent.alive ? 'alive' : agent.exiled ? 'exiled' : 'dead'})</option>`
       )
       targetSelect.innerHTML = ability === 'manifest'
         ? [`<option value="">(No target — manifest over the whole village)</option>`, ...options].join('')
-        : options.join('')
+        : ability === 'dream' && options.length === 0
+          ? [`<option value="">(No sleeping, cult-unaligned villagers right now)</option>`].join('')
+          : options.join('')
     }
 
     deityRow.style.display = ability === 'manifest' || ability === 'speak' ? 'block' : 'none'
@@ -540,6 +552,7 @@ export class DebugOverlay {
     }
 
     weatherRow.style.display = ability === 'weather' ? 'block' : 'none'
+    dreamRow.style.display = ability === 'dream' ? 'block' : 'none'
 
     panel.style.display = 'flex'
   }
@@ -552,6 +565,7 @@ export class DebugOverlay {
     const deitySelect = panel.querySelector<HTMLSelectElement>('#god-ability-confirm-deity')
     const deityCustom = panel.querySelector<HTMLInputElement>('#god-ability-confirm-deity-custom')
     const weatherSelect = panel.querySelector<HTMLSelectElement>('#god-ability-confirm-weather')
+    const dreamText = panel.querySelector<HTMLTextAreaElement>('#god-ability-confirm-dream')
     const error = panel.querySelector<HTMLElement>('#god-ability-confirm-error')
 
     const targetAgentId = targetSelect?.value || undefined
@@ -567,6 +581,19 @@ export class DebugOverlay {
     if (ability === 'speak') {
       window.dispatchEvent(new CustomEvent('debug-deity-chat-open', {
         detail: { targetAgentId, deityName },
+      }))
+      this.closeGodAbilityConfirm()
+      return
+    }
+
+    if (ability === 'dream') {
+      const biasText = dreamText?.value.trim()
+      if (!biasText) {
+        if (error) error.textContent = 'Write something to dream about.'
+        return
+      }
+      window.dispatchEvent(new CustomEvent('debug-plant-dream', {
+        detail: { targetAgentId, biasText },
       }))
       this.closeGodAbilityConfirm()
       return
@@ -1176,7 +1203,8 @@ export class DebugOverlay {
           : a.memory.recent.length > 0
             ? `<div style="color: #555; margin-top: 1px;">Memory: ${a.memory.recent.length} events${a.memory.summary ? ' + summary' : ''}</div>`
             : ''
-        const worldviewHidden = a.religiousStanceRevealed === false
+        const worldviewHidden = a.religiousStanceRevealed === false &&
+          (a.beliefSystem.religiousStance === 'atheist' || a.beliefSystem.religiousStance === 'nonbeliever')
         const deitySummary = !worldviewHidden && a.beliefSystem.deities.length > 0
           ? a.beliefSystem.deities
               .slice()
@@ -1269,10 +1297,10 @@ export class DebugOverlay {
     const roleBadges = this.renderAgentRoleBadges(agent, true)
     body.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">
-        ${this.detailSection('State', `${roleBadges ? `Role markers: ${roleBadges}<br>` : ''}Status: ${agent.exiled ? 'EXILED' : agent.alive ? 'alive' : 'DEAD'}<br>${agent.exiled ? `Exiled: ${this.formatAbsoluteMinute(agent.exiled.atMinute)}<br>Reason: ${this.escapeHtml(agent.exiled.reason)}<br>` : ''}${agent.demon ? `Demon command: ${this.escapeHtml(agent.demon.lastCommand ?? 'none')}<br>` : ''}${agent.permanentInsanity ? `<span style="color:#ef9a9a;font-weight:bold;">Permanent insanity</span>: ${this.escapeHtml(agent.permanentInsanity.reason)}<br>Onset: ${this.formatAbsoluteMinute(agent.permanentInsanity.causedAtMinute)}<br>` : ''}${agent.existentialState ? `Existential reaction: <span style="font-weight:bold;">${this.escapeHtml(agent.existentialState.reaction)}</span>${agent.existentialState.reinterpretationFrame ? ` (${this.escapeHtml(agent.existentialState.reinterpretationFrame)})` : ''}<br>` : ''}${agent.obsession ? `Obsession evidence: ${agent.obsession.evidenceCount} (${this.escapeHtml(agent.obsession.evidenceLog.slice(-1)[0] ?? 'watching closely')})<br>` : ''}Emotion: ${this.escapeHtml(this.getEmotionLabel(agent.emotionalState))}<br>Activity: ${this.escapeHtml(this.latestActivityStatuses[agentId] ?? 'unknown')}<br>LLM: ${this.escapeHtml(this.latestLLMStatuses[agentId] ?? 'idle')}<br>Last position: (${Math.round(agent.position.x)}, ${Math.round(agent.position.y)})<br>Job: ${this.escapeHtml(agent.currentJob ?? 'None')}<br>Reputation: ${Math.round(agent.reputation)}/100<br>Wealth: ${Math.round(agent.wealth)}/100<br>Political camp: ${this.escapeHtml(agent.politicalCamp?.name ?? 'unaffiliated')}`)}
+        ${this.detailSection('State', `${roleBadges ? `Role markers: ${roleBadges}<br>` : ''}Status: ${agent.exiled ? 'EXILED' : agent.alive ? 'alive' : 'DEAD'}<br>${agent.exiled ? `Exiled: ${this.formatAbsoluteMinute(agent.exiled.atMinute)}<br>Reason: ${this.escapeHtml(agent.exiled.reason)}<br>` : ''}${agent.demon ? `Demon command: ${this.escapeHtml(agent.demon.lastCommand ?? 'none')}<br>` : ''}${agent.permanentInsanity ? `<span style="color:#ef9a9a;font-weight:bold;">Permanent insanity</span>: ${this.escapeHtml(agent.permanentInsanity.reason)}<br>Onset: ${this.formatAbsoluteMinute(agent.permanentInsanity.causedAtMinute)}<br>` : ''}${agent.dream ? `<span style="color:${agent.dream.isNightmare ? '#ef9a9a' : '#ce93d8'};font-weight:bold;">${agent.dream.isNightmare ? 'Nightmare' : 'Dream'}</span> (${agent.dream.plantedBy}): ${this.escapeHtml(agent.dream.biasText)}<br>` : ''}${agent.existentialState ? `Existential reaction: <span style="font-weight:bold;">${this.escapeHtml(agent.existentialState.reaction)}</span>${agent.existentialState.reinterpretationFrame ? ` (${this.escapeHtml(agent.existentialState.reinterpretationFrame)})` : ''}<br>` : ''}${agent.obsession ? `Obsession evidence: ${agent.obsession.evidenceCount} (${this.escapeHtml(agent.obsession.evidenceLog.slice(-1)[0] ?? 'watching closely')})<br>` : ''}Emotion: ${this.escapeHtml(this.getEmotionLabel(agent.emotionalState))}<br>Activity: ${this.escapeHtml(this.latestActivityStatuses[agentId] ?? 'unknown')}<br>LLM: ${this.escapeHtml(this.latestLLMStatuses[agentId] ?? 'idle')}<br>Last position: (${Math.round(agent.position.x)}, ${Math.round(agent.position.y)})<br>Job: ${this.escapeHtml(agent.currentJob ?? 'None')}<br>Reputation: ${Math.round(agent.reputation)}/100<br>Wealth: ${Math.round(agent.wealth)}/100<br>Political camp: ${this.escapeHtml(agent.politicalCamp?.name ?? 'unaffiliated')}`)}
         ${this.detailSection('Needs and health', `HP: ${Math.round(agent.health)}/${Math.round(agent.maxHealth)}<br>Hunger: ${Math.round(agent.needs.hunger)}/100<br>Energy: ${Math.round(agent.needs.energy)}/100<br>Social: ${Math.round(agent.needs.social)}/100<br>Sanity: <span style="color:${agent.sanity <= 40 ? '#ef9a9a' : agent.sanity <= 70 ? '#ffcc80' : '#a5d6a7'};">${Math.round(agent.sanity)}/100</span><br>Inventory: ${inventory}`)}
         ${this.detailSection('Personality', `${this.renderPersonality(agent)}<br><span style="color:#90a4ae;">Aggression affects confrontation; friendliness cooperation; curiosity investigation; caution safety; ambition leadership; creativity improvisation.</span>`)}
-        ${this.detailSection('Beliefs and affiliations', (agent.demon ? 'Worldview: none<br>Faith: none<br>Deities: none<br>Cult: none' : agent.religiousStanceRevealed === false ? `Worldview: undisclosed<br>Faith: hidden<br>Deities: hidden<br>Cult: ${agent.cult ? `${this.escapeHtml(agent.cult.name)} (${this.escapeHtml(agent.cult.role)})` : 'none'}` : `Worldview: ${this.escapeHtml(agent.beliefSystem.religiousStance)}<br>Faith: ${Math.round(agent.beliefSystem.faith)}/100<br>Deities: ${agent.beliefSystem.deities.map((deity) => `${this.escapeHtml(deity.name)} ${Math.round(deity.confidence)}%`).join(', ') || 'none'}<br>Cult: ${agent.cult ? `${this.escapeHtml(agent.cult.name)} (${this.escapeHtml(agent.cult.role)})` : 'none'}`) + (agent.alderman ? `<br>Office: <strong style="color:#ffd54f;">Village Alderman</strong> (${this.escapeHtml(agent.alderman.cultName)}) — binding control over court verdicts and assembly votes` : ''))}
+        ${this.detailSection('Beliefs and affiliations', (agent.demon ? 'Worldview: none<br>Faith: none<br>Deities: none<br>Cult: none' : agent.religiousStanceRevealed === false && (agent.beliefSystem.religiousStance === 'atheist' || agent.beliefSystem.religiousStance === 'nonbeliever') ? `Worldview: undisclosed<br>Faith: hidden<br>Deities: hidden<br>Cult: ${agent.cult ? `${this.escapeHtml(agent.cult.name)} (${this.escapeHtml(agent.cult.role)})` : 'none'}` : `Worldview: ${this.escapeHtml(agent.beliefSystem.religiousStance)}<br>Faith: ${Math.round(agent.beliefSystem.faith)}/100<br>Deities: ${agent.beliefSystem.deities.map((deity) => `${this.escapeHtml(deity.name)} ${Math.round(deity.confidence)}%`).join(', ') || 'none'}<br>Cult: ${agent.cult ? `${this.escapeHtml(agent.cult.name)} (${this.escapeHtml(agent.cult.role)})` : 'none'}`) + (agent.alderman ? `<br>Office: <strong style="color:#ffd54f;">Village Alderman</strong> (${this.escapeHtml(agent.alderman.cultName)}) — binding control over court verdicts and assembly votes` : ''))}
         ${this.detailSection('Bonuses and timed effects', blessingSummary || '<span style="color:#607d8b;">No active bonuses.</span>')}
       </div>
       ${agent.forbiddenKnowledge?.length ? this.detailSection('Forbidden knowledge', agent.forbiddenKnowledge.slice().reverse().map((entry) => `<div style="padding:4px 0;border-bottom:1px solid #26333d;"><span style="color:#ce93d8;">[${this.escapeHtml(entry.category)}, -${entry.severity} sanity]</span> "${this.escapeHtml(entry.text)}"<br><span style="color:#607d8b;">${this.formatAbsoluteMinute(entry.revealedAtMinute)}</span></div>`).join('')) : ''}

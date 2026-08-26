@@ -1,8 +1,19 @@
 import { Agent } from '@/agent/Agent'
-import { ActionType, AgentAction, Building, BuildingType, DailySchedule } from '@/types'
+import { ActionType, AgentAction, Building, BuildingType, DailySchedule, EmotionalState } from '@/types'
 import { PropheticTask } from '@/ai/AIProvider'
 import { MIN_BRIBE_WEALTH } from './PoliticalSystem'
 import { ActiveBlockEntry, SystemDeps } from './SystemDeps'
+
+const SPONTANEOUS_NIGHTMARE_FLAVORS = [
+  'something vast and hungry stirring beneath the village',
+  "neighbors' faces twisting into something not quite human",
+  'a voice chanting words that hurt to remember',
+  'the ground splitting open onto endless black water',
+  'countless eyes watching from just past the firelight',
+  'a shape in the fog that knew their name',
+  'the church bell tolling a note no bell should make',
+  'their own shadow moving a beat behind them',
+]
 
 export interface ScheduleState {
   dailySchedules: Map<string, DailySchedule>
@@ -352,6 +363,8 @@ export class ScheduleSystem {
       if (active.action.action === 'sleep' && active.sleepStartedAt === undefined) {
         active.sleepStartedAt = now
         active.endsAt = now + (active.action.durationMinutes ?? 120)
+        agent.state.dream = undefined
+        this.rollSpontaneousNightmare(agent)
         continue
       }
       if (now < active.endsAt && !movementFinished) continue
@@ -734,5 +747,43 @@ export class ScheduleSystem {
       relocated,
       message: `Refreshed ${relocated} living agents without resetting village history or identities.`,
     }
+  }
+
+  // Cult-unaligned villagers are otherwise the only ones exempt from
+  // ReligionSystem.plantDream's shielding, so they're also the ones whose
+  // dreams can turn on them unprompted: each time one starts a fresh sleep,
+  // roll a low chance the town's own ambient corruption bleeds into their
+  // sleeping mind as a nightmare, worse the frailer their sanity already is.
+  private rollSpontaneousNightmare(agent: Agent): void {
+    if (agent.state.cult) return
+    const corruption = this.deps.getTownCorruptionLevel()
+    if (corruption <= 0) return
+    const sanityFactor = Math.max(0.2, (100 - agent.state.sanity) / 100)
+    const chancePercent = Math.min(15, 2 * corruption * (0.5 + sanityFactor))
+    if (Math.random() * 100 >= chancePercent) return
+
+    const flavor = SPONTANEOUS_NIGHTMARE_FLAVORS[Math.floor(Math.random() * SPONTANEOUS_NIGHTMARE_FLAVORS.length)]
+    const previousSanity = agent.state.sanity
+    agent.state.sanity = Math.max(0, previousSanity - (3 + Math.round(Math.random() * 7)))
+    agent.state.emotionalState = EmotionalState.AFRAID
+    agent.state.lastReasoning = `I dreamed of ${flavor}. I woke shaking, and I do not know why it felt so real.`
+    agent.state.dream = {
+      plantedBy: 'spontaneous',
+      biasText: flavor,
+      isNightmare: true,
+      plantedAtMinute: this.getAbsoluteMinute(),
+    }
+
+    const event = this.deps.eventBus.emit({
+      type: 'dream_planted',
+      agentId: agent.state.id,
+      actionType: ActionType.IDLE,
+      outcome: 'nightmare',
+      description: `${agent.state.name} woke from a nightmare of ${flavor}, sanity slipping from ${previousSanity.toFixed(0)} to ${agent.state.sanity.toFixed(0)}.`,
+      causationIds: [],
+      worldStateDelta: { isNightmare: true, biasText: flavor, corruption },
+      observers: [agent.state.id],
+    })
+    agent.addRecentMemory(event)
   }
 }

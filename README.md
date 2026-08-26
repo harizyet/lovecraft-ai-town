@@ -32,6 +32,13 @@ Inspired by the research paper [Generative Agents: Interactive Simulacra of Huma
 * **Permanent Insanity** — Witnessing Demon manifestations or targeted divine actions can drive non-cultist/nonbelieving agents permanently insane, forcing panicked and erratic behaviors that persist through saves and reloads.
 * **Corruption Twists** — Direct whispers to a Priest can corrupt them, making them a hidden Prophet/cult leader. They rename their congregation to evoke ancient, inhuman deities while retaining their public Priest facade to avoid suspicion.
 * **Defection & Mobs** — Disillusioned members defect, becoming enemies of their former cult and potentially forming anti-cult groups. High-aggression cults can form mobs to hunt down and attack nonbelievers.
+* **Dreamscape** — A gated Deity ability lets the player reach into a sleeping, cult-unaligned villager's mind and plant a dream or nightmare, with lower sanity raising the odds it curdles into the latter. The same unaffiliated villagers can also nightmare on their own, odds rising with the town's ambient corruption — either way it colors the villager's private reasoning and gets brought up unprompted in their next conversation, then fades once they sleep again.
+
+### 🌫️ Environmental Decay & Weather Corruption
+* **Localized Corruption Field** — Cult shrines, bound Demons, and active summoning rituals bleed a spreading, decaying corruption value into nearby tiles, giving the otherwise-static world a visible, localized consequence of the social world's own corruption.
+* **Brackish Water & Blighted Crops** — Water tiles crossing a corruption threshold turn foul and brackish; farm buildings crossing it have their fields blacken and fail. Both are narrated as one-time events the first time they occur.
+* **Persistent Fog** — Heavily corrupted tiles are rendered with a lingering, ambient fog overlay distinct from the global weather system.
+* **Reversible Tint, Permanent Blight** — The transient tint/fog only grows near an active source and heals once a shrine loses its congregation or a Demon is gone, but **Eldritch Blight** is forever: a grass or water tile that sits at sufficiently high corruption for a sustained stretch of simulated time permanently converts into anomalous, blighted ground or brackish water, becoming a lasting scar on the map that outlasts whatever caused it.
 
 ### ⚖️ Justice & Politics
 * **Resolution Courts** — When a rumour reaches everyone in town (or an authority override triggers), the village gathers at the town square for a trial. The accused delivers an LLM defense, and villagers vote to **Absolve**, **Exile** (inactive/hidden state), or **Execute** (permanent death).
@@ -129,6 +136,7 @@ ai-town/
 │   │       ├── SocialSystem.ts        # Encounters, conversation batching & context
 │   │       ├── OutsiderSystem.ts      # Knight/Inquisitor spawning & combat
 │   │       ├── StorySystem.ts         # Narrates major story moments
+│   │       ├── EnvironmentSystem.ts   # Localized tile corruption from cult/demon/ritual activity
 │   │       └── SystemDeps.ts          # Shared dependency-injection interface between systems
 │   ├── ai/
 │   │   ├── AIProvider.ts              # OpenAI HTTP client & markdown stripping
