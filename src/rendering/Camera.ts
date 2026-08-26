@@ -33,6 +33,11 @@ export class Camera {
     }
   }
 
+  pan(dx: number, dy: number): void {
+    this.targetPosition.x += dx
+    this.targetPosition.y += dy
+  }
+
   zoomIn(): void {
     this.targetZoom = Math.min(this.targetZoom * 1.2, this.maxZoom)
   }

@@ -16,6 +16,7 @@ export class World {
   }
 
   generate(): void {
+    this.buildings.clear()
     this.initializeTiles()
     this.generateTerrain()
     this.generateRoads()
@@ -139,40 +140,63 @@ export class World {
       BuildingType.HOME,
       BuildingType.HOME,
       BuildingType.HOME,
-      BuildingType.SHOP,
+      BuildingType.HOME,
+      BuildingType.MANOR,
+      BuildingType.SMITHY,
+      BuildingType.CARPENTER_WORKSHOP,
+      BuildingType.MARKET,
+      BuildingType.GUARDHOUSE,
+      BuildingType.APOTHECARY,
+      BuildingType.TAVERN,
+      BuildingType.FARM,
       BuildingType.TOWN_SQUARE,
-      BuildingType.RESTAURANT,
-      BuildingType.WORKSHOP,
       BuildingType.CHURCH,
     ]
 
     const roadPositions = this.findRoadPositions()
-    const placedBuildings: Vector2[] = []
 
     for (const buildingType of buildingTypes) {
       if (roadPositions.length === 0) break
 
-      const attempts = 50
+      const size =
+        buildingType === BuildingType.TOWN_SQUARE
+          ? { w: 7, h: 7 }
+          : { w: 4 + Math.floor(Math.random() * 3), h: 4 + Math.floor(Math.random() * 3) }
+      const attempts = 250
+      let placed = false
       for (let i = 0; i < attempts; i++) {
         const roadPos =
           roadPositions[Math.floor(Math.random() * roadPositions.length)]
         const side = Math.random() > 0.5 ? 1 : -1
         const offsetAxis = Math.random() > 0.5
 
-        let bx = offsetAxis ? roadPos.x + side * 2 : roadPos.x
-        let by = offsetAxis ? roadPos.y : roadPos.y + side * 2
+        const bx = offsetAxis
+          ? side > 0 ? roadPos.x + 2 : roadPos.x - size.w - 1
+          : roadPos.x - Math.floor(size.w / 2)
+        const by = offsetAxis
+          ? roadPos.y - Math.floor(size.h / 2)
+          : side > 0 ? roadPos.y + 2 : roadPos.y - size.h - 1
 
-        const size =
-          buildingType === BuildingType.TOWN_SQUARE
-            ? { w: 7, h: 7 }
-            : { w: 4 + Math.floor(Math.random() * 3), h: 4 + Math.floor(Math.random() * 3) }
-
-        if (this.canPlaceBuilding(bx, by, size.w, size.h, placedBuildings)) {
+        if (this.canPlaceBuilding(bx, by, size.w, size.h)) {
           const building = this.createBuilding(buildingType, bx, by, size.w, size.h)
           this.buildings.set(building.id, building)
           this.markBuildingTiles(bx, by, size.w, size.h, building.id)
-          placedBuildings.push({ x: bx, y: by })
+          placed = true
           break
+        }
+      }
+      if (!placed) {
+        const fallback = this.findNonOverlappingBuildingPosition(size.w, size.h)
+        if (fallback) {
+          const building = this.createBuilding(
+            buildingType,
+            fallback.x,
+            fallback.y,
+            size.w,
+            size.h
+          )
+          this.buildings.set(building.id, building)
+          this.markBuildingTiles(fallback.x, fallback.y, size.w, size.h, building.id)
         }
       }
     }
@@ -194,17 +218,23 @@ export class World {
     x: number,
     y: number,
     w: number,
-    h: number,
-    placed: Vector2[]
+    h: number
   ): boolean {
     if (x < 1 || y < 1 || x + w > this.width - 1 || y + h > this.height - 1) {
       return false
     }
 
-    for (const px of placed) {
+    const gap = 2
+    for (const building of this.buildings.values()) {
+      const existingX = building.position.x
+      const existingY = building.position.y
+      const existingW = building.size.x
+      const existingH = building.size.y
       if (
-        Math.abs(x - px.x) < w + 2 &&
-        Math.abs(y - px.y) < h + 2
+        x < existingX + existingW + gap &&
+        x + w + gap > existingX &&
+        y < existingY + existingH + gap &&
+        y + h + gap > existingY
       ) {
         return false
       }
@@ -213,7 +243,12 @@ export class World {
     for (let dy = 0; dy < h; dy++) {
       for (let dx = 0; dx < w; dx++) {
         const tile = this.tiles[y + dy][x + dx]
-        if (tile.type === TileType.WATER) {
+        if (
+          tile.type === TileType.WATER ||
+          tile.type === TileType.ROAD ||
+          tile.type === TileType.BUILDING ||
+          tile.buildingId
+        ) {
           return false
         }
       }
@@ -227,24 +262,31 @@ export class World {
     x: number,
     y: number,
     w: number,
-    h: number
+    h: number,
+    customName?: string
   ): Building {
     const names: Record<BuildingType, string[]> = {
       [BuildingType.HOME]: [
-        'Maple Street House',
-        'Oak Avenue Home',
-        'Pine Ridge House',
-        'Elm Street Apartment',
-        'Cedar Lane House',
-        'Willow Drive Home',
-        'Birch Court House',
+        'Timber Cottage',
+        'Wattle and Daub House',
+        'Stone Hearth Cottage',
+        'Thatchroof Dwelling',
       ],
-      [BuildingType.SHOP]: ['Corner Store', 'Downtown Market', 'Plaza Shop', 'Main Street Store'],
-      [BuildingType.TOWN_SQUARE]: ['Town Square'],
-      [BuildingType.RESTAURANT]: ['The Local Diner', 'Main Street Grill', 'Corner Cafe'],
-      [BuildingType.WORKSHOP]: ['Auto Repair Shop', 'Tool & Equipment'],
-      [BuildingType.CHURCH]: ['Community Center', 'City Hall'],
-      [BuildingType.PARK]: ['Central Park'],
+      [BuildingType.SHOP]: ['Village Chandler', 'General Goods Stall'],
+      [BuildingType.TOWN_SQUARE]: ['Market Square'],
+      [BuildingType.RESTAURANT]: ['Cookhouse', 'Alehouse Kitchen'],
+      [BuildingType.WORKSHOP]: ['Artisan Workshop', 'Craft Hall'],
+      [BuildingType.CHURCH]: ['Parish Church', 'Stone Chapel'],
+      [BuildingType.PARK]: ['Village Green'],
+      [BuildingType.SMITHY]: ['The Village Smithy', 'Ironfire Forge'],
+      [BuildingType.CARPENTER_WORKSHOP]: ['Carpenter’s Workshop', 'Woodwright’s Yard'],
+      [BuildingType.MARKET]: ['Covered Market', 'Merchants’ Market'],
+      [BuildingType.GUARDHOUSE]: ['Town Guardhouse', 'Watch House'],
+      [BuildingType.APOTHECARY]: ['Herbalist’s Apothecary', 'House of Physic'],
+      [BuildingType.MANOR]: ['Steward’s Manor', 'Manor Hall'],
+      [BuildingType.TAVERN]: ['The Crown and Boar', 'The Pilgrim’s Rest'],
+      [BuildingType.FARM]: ['Village Farmstead', 'Common Fields Farm'],
+      [BuildingType.CULT_SHRINE]: ['Hidden Shrine', 'Sacred Grove', 'Forgotten Altar'],
     }
 
     const descriptions: Record<BuildingType, string> = {
@@ -255,10 +297,19 @@ export class World {
       [BuildingType.WORKSHOP]: 'A workshop for repairs and crafting.',
       [BuildingType.CHURCH]: 'A community building and office.',
       [BuildingType.PARK]: 'A peaceful area with trees and open space.',
+      [BuildingType.SMITHY]: 'A hot stone forge where the blacksmith shapes iron and repairs tools.',
+      [BuildingType.CARPENTER_WORKSHOP]: 'A timber yard and workshop for carpentry and joinery.',
+      [BuildingType.MARKET]: 'A covered market where merchants trade food, cloth, tools, and household goods.',
+      [BuildingType.GUARDHOUSE]: 'The fortified post of the town guard beside the village approaches.',
+      [BuildingType.APOTHECARY]: 'A healer’s shop filled with herbs, salves, and medicinal preparations.',
+      [BuildingType.MANOR]: 'The manor hall where the steward administers village affairs.',
+      [BuildingType.TAVERN]: 'A busy tavern offering ale, meals, lodging, and conversation.',
+      [BuildingType.FARM]: 'A working farmstead with fields, livestock, and stored produce.',
+      [BuildingType.CULT_SHRINE]: 'A shrine raised by a cult for its own private rites and gatherings.',
     }
 
     const nameList = names[type]
-    const name = nameList[Math.floor(Math.random() * nameList.length)]
+    const name = customName?.trim() || nameList[Math.floor(Math.random() * nameList.length)]
 
     return {
       id: `building_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -301,6 +352,48 @@ export class World {
     }
   }
 
+  public repairBuildingOverlaps(): number {
+    const savedBuildings = Array.from(this.buildings.values())
+    for (const row of this.tiles) {
+      for (const tile of row) {
+        if (tile.type !== TileType.BUILDING && !tile.buildingId) continue
+        tile.type = TileType.GRASS
+        tile.walkable = true
+        delete tile.buildingId
+      }
+    }
+
+    this.buildings = new Map()
+    let moved = 0
+    for (const building of savedBuildings) {
+      let x = Math.round(building.position.x)
+      let y = Math.round(building.position.y)
+      const w = Math.max(1, Math.round(building.size.x))
+      const h = Math.max(1, Math.round(building.size.y))
+      if (!this.canPlaceBuilding(x, y, w, h)) {
+        const replacement = this.findNonOverlappingBuildingPosition(w, h)
+        if (!replacement) continue
+        x = replacement.x
+        y = replacement.y
+        moved++
+      }
+      building.position = { x, y }
+      building.size = { x: w, y: h }
+      this.buildings.set(building.id, building)
+      this.markBuildingTiles(x, y, w, h, building.id)
+    }
+    return moved
+  }
+
+  private findNonOverlappingBuildingPosition(w: number, h: number): Vector2 | null {
+    for (let y = 1; y <= this.height - h - 1; y++) {
+      for (let x = 1; x <= this.width - w - 1; x++) {
+        if (this.canPlaceBuilding(x, y, w, h)) return { x, y }
+      }
+    }
+    return null
+  }
+
   getTile(x: number, y: number): Tile | null {
     if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
       return null
@@ -323,5 +416,44 @@ export class World {
 
   public getBuildings(): Building[] {
     return Array.from(this.buildings.values())
+  }
+
+  // Places a genuinely new building at runtime (used for cult shrines),
+  // searching outward from a preferred spot before falling back to any free
+  // location in the world, the same placement rules world generation uses
+  // (clearance, no road/water tiles).
+  public tryPlaceBuilding(
+    type: BuildingType,
+    near: Vector2,
+    w: number,
+    h: number,
+    options: { cultId?: string; name?: string } = {}
+  ): Building | null {
+    const maxRadius = 24
+    let position: Vector2 | null = null
+    const originX = Math.round(near.x)
+    const originY = Math.round(near.y)
+    search:
+    for (let radius = 0; radius <= maxRadius; radius++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
+          const x = originX + dx
+          const y = originY + dy
+          if (this.canPlaceBuilding(x, y, w, h)) {
+            position = { x, y }
+            break search
+          }
+        }
+      }
+    }
+    if (!position) position = this.findNonOverlappingBuildingPosition(w, h)
+    if (!position) return null
+
+    const building = this.createBuilding(type, position.x, position.y, w, h, options.name)
+    if (options.cultId) building.cultId = options.cultId
+    this.buildings.set(building.id, building)
+    this.markBuildingTiles(position.x, position.y, w, h, building.id)
+    return building
   }
 }

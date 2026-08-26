@@ -3,6 +3,7 @@ import { ActionType, RelationshipType, SimulationEvent } from '@/types'
 import { EventBus } from '@/interaction/EventBus'
 
 export class AgentInteraction {
+  private static readonly INSTANT_KILL_CHANCE = 0.1
   private eventBus: EventBus
   private witnessRadius: number
 
@@ -15,19 +16,35 @@ export class AgentInteraction {
     attacker: Agent,
     target: Agent,
     allAgents: Agent[]
-  ): { damage: number; died: boolean; eventId: string } {
-    const damage = 20 + Math.floor(Math.random() * 30)
+  ): { damage: number; died: boolean; instantKill: boolean; eventId: string } {
+    const demonProtected = Boolean(target.state.demon) &&
+      !['knight', 'inquisitor'].includes(attacker.state.outsider?.kind ?? '')
+    const instantKill = !demonProtected && target.state.alive && Math.random() < AgentInteraction.INSTANT_KILL_CHANCE
+    const damage = instantKill
+      ? target.state.health
+      : demonProtected ? 0 : 20 + Math.floor(Math.random() * 30)
     const died = target.takeDamage(damage, attacker.state.id)
+    const reaction = died || demonProtected
+      ? { developedFear: false, developedGrudge: false }
+      : this.maybeDevelopAttackResentment(target, attacker, damage)
 
     const event = this.eventBus.emit({
       type: 'attack',
       agentId: attacker.state.id,
       actionType: ActionType.ATTACK,
       targetId: target.state.id,
-      outcome: died ? 'death' : 'injury',
-      description: `${attacker.state.name} attacked ${target.state.name} for ${damage} damage${died ? ' - KILLED' : ''}`,
+      outcome: died ? 'death' : demonProtected ? 'invulnerable' : 'injury',
+      description: demonProtected
+        ? `${attacker.state.name} attacked ${target.state.name}, but the Demon was invulnerable to the non-outsider attack.`
+        : `${attacker.state.name} attacked ${target.state.name} for ${damage} damage${instantKill ? ' - LETHAL STRIKE' : died ? ' - KILLED' : ''}`,
       causationIds: this.findCausation(attacker.state.id, 'aggression'),
       worldStateDelta: {
+        eventClassification: 'violent_incident',
+        eventOccurred: true,
+        instantKill,
+        demonProtected,
+        developedFear: reaction.developedFear,
+        developedGrudge: reaction.developedGrudge,
         targetHealth: target.state.health,
         targetAlive: target.state.alive,
       },
@@ -42,13 +59,15 @@ export class AgentInteraction {
       this.handleDeath(target, attacker, allAgents)
     }
 
-    return { damage, died, eventId: event.id }
+    return { damage, died, instantKill, eventId: event.id }
   }
 
   public handleConversation(
     speaker: Agent,
     listener: Agent,
-    dialogue: string
+    dialogue: string,
+    causationIds: string[] = [],
+    worldStateDelta: Record<string, unknown> = {}
   ): string {
     speaker.socialize()
     listener.socialize()
@@ -60,8 +79,8 @@ export class AgentInteraction {
       targetId: listener.state.id,
       outcome: 'completed',
       description: `${speaker.state.name} said to ${listener.state.name}: "${dialogue}"`,
-      causationIds: [],
-      worldStateDelta: {},
+      causationIds,
+      worldStateDelta,
       observers: [],
     })
 
@@ -70,6 +89,47 @@ export class AgentInteraction {
     this.updateRelationships(speaker, listener, 'friendly')
 
     return event.id
+  }
+
+  public handleCultSacrifice(
+    sacrificer: Agent,
+    victim: Agent,
+    allAgents: Agent[]
+  ): { eventId: string; died: boolean } {
+    if (!sacrificer.state.alive || !victim.state.alive) return { eventId: '', died: false }
+    const selfSacrifice = sacrificer.state.id === victim.state.id
+    const damage = victim.state.health
+    const died = victim.takeDamage(damage, sacrificer.state.id)
+    const cultName = sacrificer.state.cult?.name ?? 'their cult'
+    const event = this.eventBus.emit({
+      type: 'attack',
+      agentId: sacrificer.state.id,
+      targetId: victim.state.id,
+      actionType: ActionType.ATTACK,
+      outcome: 'death',
+      description: selfSacrifice
+        ? `${sacrificer.state.name} sacrificed themselves for ${cultName} to regain God's attention.`
+        : `${sacrificer.state.name} sacrificed fellow cult member ${victim.state.name} for ${cultName} to regain God's attention.`,
+      causationIds: [],
+      worldStateDelta: {
+        eventClassification: 'violent_incident',
+        eventOccurred: true,
+        cultSacrifice: true,
+        selfSacrifice,
+        cultId: sacrificer.state.cult?.id,
+        targetHealth: 0,
+        targetAlive: false,
+      },
+      observers: [],
+    })
+    sacrificer.addRecentMemory(event)
+    if (!selfSacrifice) {
+      victim.addRecentMemory(event)
+      this.updateRelationships(sacrificer, victim, 'hostile')
+    }
+    this.notifyWitnesses(sacrificer.state.position, event.id, allAgents, 'cult sacrifice')
+    if (died) this.handleDeath(victim, sacrificer, allAgents)
+    return { eventId: event.id, died }
   }
 
   public handleHelp(
@@ -157,7 +217,55 @@ export class AgentInteraction {
     })
 
     agent.addRecentMemory(event)
-    agent.state.fears.push(threatId)
+    if (!agent.state.fears.includes(threatId)) agent.state.fears.push(threatId)
+  }
+
+  private maybeDevelopAttackResentment(
+    victim: Agent,
+    attacker: Agent,
+    damage: number
+  ): { developedFear: boolean; developedGrudge: boolean } {
+    const severity = Math.min(1, damage / victim.state.maxHealth)
+    const fearChance = Math.max(0.1, Math.min(0.8,
+      0.15 + victim.state.personality.caution * 0.35 + severity * 0.3 -
+      victim.state.personality.aggression * 0.1
+    ))
+    const grudgeChance = Math.max(0.1, Math.min(0.8,
+      0.15 + victim.state.personality.aggression * 0.4 + severity * 0.3 -
+      victim.state.personality.friendliness * 0.15
+    ))
+    const developedFear = !victim.state.fears.includes(attacker.state.id) && Math.random() < fearChance
+    const developedGrudge = !victim.state.grudges.includes(attacker.state.id) && Math.random() < grudgeChance
+    if (developedFear) victim.state.fears.push(attacker.state.id)
+    if (developedGrudge) victim.state.grudges.push(attacker.state.id)
+    return { developedFear, developedGrudge }
+  }
+
+  public handleSuicide(
+    agent: Agent,
+    allAgents: Agent[]
+  ): string {
+    agent.state.health = 0
+    agent.state.alive = false
+    agent.state.path = []
+    agent.state.pathIndex = 0
+
+    const event = this.eventBus.emit({
+      type: 'death',
+      agentId: agent.state.id,
+      actionType: ActionType.ATTACK,
+      targetId: agent.state.id,
+      outcome: 'death',
+      description: `${agent.state.name} has committed suicide due to severe insanity.`,
+      causationIds: [],
+      worldStateDelta: { agentHealth: 0, agentAlive: false, suicide: true },
+      observers: [],
+    })
+
+    agent.addRecentMemory(event)
+    const witnessIds = this.notifyWitnesses(agent.state.position, event.id, allAgents, 'suicide')
+    agent.state.lastDeath = { witnessIds: witnessIds.filter((id) => id !== agent.state.id) }
+    return event.id
   }
 
   private handleDeath(
@@ -177,7 +285,9 @@ export class AgentInteraction {
       observers: [],
     })
 
-    this.notifyWitnesses(deceased.state.position, event.id, allAgents, 'death')
+    deceased.addRecentMemory(event)
+    const witnessIds = this.notifyWitnesses(deceased.state.position, event.id, allAgents, 'death')
+    deceased.state.lastDeath = { witnessIds: witnessIds.filter((id) => id !== deceased.state.id) }
     this.spreadGossip(deceased.state.id, killer.state.id, allAgents, deceased.state.position)
   }
 
@@ -238,7 +348,8 @@ export class AgentInteraction {
     eventId: string,
     allAgents: Agent[],
     eventType: string
-  ): void {
+  ): string[] {
+    const witnessIds: string[] = []
     for (const agent of allAgents) {
       if (!agent.state.alive) continue
       const dx = agent.state.position.x - position.x
@@ -246,6 +357,7 @@ export class AgentInteraction {
       const dist = Math.sqrt(dx * dx + dy * dy)
 
       if (dist <= this.witnessRadius) {
+        witnessIds.push(agent.state.id)
         const event: SimulationEvent = {
           id: `witness_${eventId}_${agent.state.id}`,
           timestamp: Date.now(),
@@ -261,6 +373,7 @@ export class AgentInteraction {
         agent.addRecentMemory(event)
       }
     }
+    return witnessIds
   }
 
   private spreadGossip(

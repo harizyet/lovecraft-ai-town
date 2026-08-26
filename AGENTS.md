@@ -80,8 +80,8 @@ main.ts
 | 5 | **Pathfinding** | `AStarPathfinder.ts` | A*, 4-directional, Manhattan heuristic, smooth interpolated movement |
 | 6 | **Agent rendering** | `Renderer.ts` | Colored circles (name-hash based), selection ring, names, health bars, emotion dots, dead bodies with "RIP" |
 | 7 | **LLM client** | `AIProvider.ts` | LM Studio/OpenAI-compatible, auto-connect check, markdown fence stripping, action alias normalization |
-| 8 | **Decision loop** | `AgentManager.ts` | Periodic LLM calls, 14 action types, target resolution (exact + partial name match) |
-| 9 | **Memory system** | `Agent.ts`, `AgentManager.ts` | 30-event recent buffer + LLM-generated summary (triggers at 200+ chars) |
+| 8 | **Decision loop** | `AgentManager.ts` | Event-driven daily schedules and decisions; globally serialized LLM lane with immediate blocking retry on failure |
+| 9 | **Memory system** | `Agent.ts`, `AgentManager.ts` | 30-event recent buffer + deterministic day-boundary compaction |
 | 10 | **Prompt design** | `PromptBuilder.ts`, `AIProvider.ts` | Full system prompt: personality, unrestricted actions, conversation rules, JSON-only output |
 | 11 | **Event bus** | `EventBus.ts` | Pub/sub with wildcard `*`, timestamped events, history queries by agent/type/time/recency |
 | 12 | **Agent-to-agent** | `AgentInteraction.ts`, `ConversationManager.ts` | Attack (20-50 dmg), steal, help (15-25 heal), flee, conversation, relationship tracking |
@@ -91,14 +91,16 @@ main.ts
 | 16 | **Debug overlay** | `DebugOverlay.ts` | F1 toggle, 400px slide-in panel, event log (color-coded, filterable), agent states, world state |
 | 17 | **Simulation controls** | `SimulationManager.ts`, `Renderer.ts` | Space=pause, speed multiplier, day/night cycle with smooth dawn/dusk (brightness 0.3-1.0) |
 | 18 | **Log export** | `DebugOverlay.ts` | JSON and CSV download buttons |
+| 19 | **Weather system** | `SimulationManager.ts`, `AgentManager.ts` | Clear/cloudy/rain/storm transitions; outdoor workers seek nearest indoor shelter in hazardous weather |
+| 20 | **Rumour system** | `AgentManager.ts`, `DebugOverlay.ts` | Events seed rumours, conversations spread them, whispers inject them, and agent reactions are tracked in the UI |
 
 ### Partially Implemented / Simplified
 
 | Feature | Current State | Gap |
 |---------|--------------|-----|
 | **Building interiors** | `Building.interiorTiles` exists but never populated | Buildings render as surface rects with roofs; no interior navigation |
-| **Gossip propagation** | One-time burst to nearby agents at death | Not a spreading chain over time |
-| **Memory summarization** | Triggers when `eventsText.length > 200` and LLM available | No fallback when LLM is down |
+| **Rumour mutation** | Rumours spread between agents with credibility decay | Wording remains stable during transmission |
+| **Memory summarization** | Deterministic compaction at day boundaries | Summaries are extractive rather than LLM-generated |
 | **Rule-based fallback** | Warning logged when LLM unavailable | No explicit rule-based behavior system |
 
 ### Not Yet Implemented
@@ -118,7 +120,7 @@ main.ts
 Map:        60 x 40 tiles, 32px per tile
 Agents:     8
 LLM:        localhost:1234, model "llama3"
-Memory:     30-event buffer, 100s summary interval
+Memory:     30-event buffer, compacted at each day boundary
 Tick rate:  16ms (~60 FPS)
 ```
 
@@ -137,9 +139,10 @@ Tick rate:  16ms (~60 FPS)
 ### Agent Freedom
 - **Unrestricted** — LLM can choose any action including violence, theft, destruction. This is a simulation.
 
-### Agent Decision Cycle (every ~5-10 sim seconds)
+### Agent Decision Cycle (event-driven)
 ```
-Agent state + observations → LLM → { action, target, reasoning, dialogue, emotionalState }
+Day start → LLM daily schedule → execute task block
+Task completion / interaction / notable event → LLM → next task block
 ```
 
 ### LLM Output Structure
@@ -181,7 +184,7 @@ job, emotion, path, conversation state
 
 ### Memory System
 - **Recent buffer** — Last 30 events directly in context (15 sent to LLM per prompt)
-- **Summarized long-term** — Periodic LLM-generated summary of older events appended to context
+- **Summarized long-term** — Older descriptions are compacted locally at each day boundary
 - Balances cost/accuracy with rich agent awareness
 
 ### World Data
@@ -193,7 +196,7 @@ job, emotion, path, conversation state
 ```
 Action → Event emitted → World state updated →
 Nearby agents observe (radius 8) → Their memory updated →
-Their next LLM call includes the event → They react
+The event queues an LLM reaction for affected agents
 ```
 
 ### Death System
@@ -207,9 +210,32 @@ Their next LLM call includes the event → They react
 - Attack → hostile, Help/Conversation → friendly, Steal → hostile
 
 ### Conversation System
+- Conversations are exclusive pairs: an agent already speaking with someone cannot be placed into a second conversation, and turns/events are recorded only after the pair operation succeeds
+- Proximity encounters fire once per entry. A pair must separate beyond the encounter radius before it can trigger another greeting; genuine later re-encounters rotate contextual openers
+- Conversation inactivity closure is suspended while either participant has a queued or pending decision, preventing the serialized LLM lane from timing out a partner response
 - Proximity check + 45s cooldown between conversations
-- Auto-close on max turns, 60s inactivity, or partner moving too far
+- Known agents always exchange a brief greeting on encounter; unfamiliar agents may greet or ignore based on a configurable multiplier (35% base chance)
+- Auto-close on max turns, 5 simulated minutes of inactivity, or partner moving too far
 - Context passed to LLM for ongoing dialogue continuity
+
+### Rumour System
+- Successful theft, injury, death, and building destruction can form natural rumours
+- Agents pass rumours only when their dialogue actually mentions the claim; friendliness and the listener's authority affect whether a relevant rumour comes up naturally
+- Each unique speaker affects credibility once according to their reputation; conduct and verified or unsubstantiated claims update reputation over time
+- Semantically related rumour pairs corroborate each other once, adding 10 percentage points to both credibility scores up to a 95% cap; relation counts are visible in both rumour panels
+- During conversation, creativity-weighted rolls can invent a new local suspicion when there is nothing to share or mutate a known unverified claim. Mutation attempts occur once per agent/claim, invention has a three-simulated-hour agent cooldown, and both must appear in spoken dialogue before transmission
+- Rumours carry provenance independently from factual status (`event`, `anonymous`, `intuition`, `dream`, `divine`, or `mutation`). The whisper source-hint box infers provenance; divine hints can name a deity
+- Agents track faith plus named deity confidence/revelation counts. Divine messages can be adopted based on prior faith, preserved in dialogue and thoughts, spread to others, and strengthened or weakened by later findings; fixed/seeded stances remain evidence-resistant
+- `rumourExtremeBeliefProbability` controls the chance that first exposure locks an agent into full belief or denial; other agents remain uncertain until evidence arrives
+- Direct whisper recipients are seed believers: they receive a locked believer stance regardless of the configured probability or later contradictory evidence, except that atheists reject whispers as false with a fixed denier stance
+- Every rumour delivery and investigation result creates a private `thought` memory recording that agent's interpretation
+- A newly informed agent must mention the rumour to their first subsequent conversation partner other than the source who introduced it; the pending marker clears only after the claim is actually spoken
+- `rumourPropagationMultiplier` scales both the chance that an encounter with shareable information becomes a conversation and the organic non-pending rumour mention chance; forced first shares are unaffected
+- The independent left-side Rumour & Belief Tracker summarizes live claim state and renders the newest private `thought` events; it continues updating when the F1 debug overlay is hidden
+- Rumours are explicitly unverified in prompts; relevant jobs launch investigation blocks that resolve claims as verified or unsubstantiated from recorded evidence
+- The Sheriff treats every unresolved rumour as an investigation priority. Sheriff rumour triggers move ahead of routine queued decisions, remain separate when several arrive together, and can proceed even when another profession is already investigating
+- The debug overlay can whisper a rumour to one agent or the entire town
+- Reach, transmissions, credibility, investigation status/findings, and the three most recent reactions are visible in the Rumours & Whispers panel
 
 ### Logging
 - Every action logged: timestamp, agent, action type, target, outcome, world-state delta

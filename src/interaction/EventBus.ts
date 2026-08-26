@@ -83,4 +83,12 @@ export class EventBus {
   public toJSON(): SimulationEvent[] {
     return this.events
   }
+
+  public restore(events: SimulationEvent[]): void {
+    this.events = [...events]
+    this.eventCounter = events.reduce((largest, event) => {
+      const match = /^evt_(\d+)$/.exec(event.id)
+      return match ? Math.max(largest, Number(match[1]) + 1) : largest
+    }, 0)
+  }
 }

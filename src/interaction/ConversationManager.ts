@@ -11,34 +11,46 @@ export class ConversationManager {
   constructor(eventBus: EventBus) {
     this.eventBus = eventBus
     this.conversationCooldowns = new Map()
-    this.cooldownDuration = 45
+    this.cooldownDuration = 45_000
     this.proximityRadius = 4
   }
 
-  public checkConversationEligibility(agent: Agent, target: Agent, simTime: number): 'active' | 'cooldown' | 'eligible' | 'tooFar' {
+  public checkConversationEligibility(agent: Agent, target: Agent, simTime: number): 'active' | 'busy' | 'cooldown' | 'eligible' | 'tooFar' {
     if (agent.distanceTo(target.state) > this.proximityRadius) {
       return 'tooFar'
     }
 
-    if (agent.isConversationActive()) {
-      const partnerId = agent.getConversationPartnerId()
-      if (partnerId === target.state.id) {
-        return 'active'
-      }
-    }
+    const agentPartnerId = agent.getConversationPartnerId()
+    const targetPartnerId = target.getConversationPartnerId()
+    if (agentPartnerId === target.state.id && targetPartnerId === agent.state.id) return 'active'
+    if (agent.isConversationActive() || target.isConversationActive()) return 'busy'
 
     const cooldownKey = [agent.state.id, target.state.id].sort().join('-')
-    const lastTalk = this.conversationCooldowns.get(cooldownKey) ?? 0
-    if (simTime - lastTalk < this.cooldownDuration) {
+    const lastTalk = this.conversationCooldowns.get(cooldownKey)
+    if (lastTalk !== undefined && simTime - lastTalk < this.cooldownDuration) {
       return 'cooldown'
     }
 
     return 'eligible'
   }
 
-  public initiateConversation(agent: Agent, target: Agent, dialogue: string, topic: string, simTime: number): boolean {
+  public initiateConversation(
+    agent: Agent,
+    target: Agent,
+    dialogue: string,
+    topic: string,
+    simTime: number,
+    ignoreCooldown = false
+  ): boolean {
+    const eligibility = this.checkConversationEligibility(agent, target, simTime)
+    if (eligibility !== 'eligible' && !(ignoreCooldown && eligibility === 'cooldown')) return false
     const cooldownKey = [agent.state.id, target.state.id].sort().join('-')
     this.conversationCooldowns.set(cooldownKey, simTime)
+
+    agent.state.path = []
+    agent.state.pathIndex = 0
+    target.state.path = []
+    target.state.pathIndex = 0
 
     const convId = agent.startConversation(target.state.id, target.state.name, topic)
     target.startConversation(agent.state.id, agent.state.name, topic)
@@ -61,7 +73,16 @@ export class ConversationManager {
 
   public addTurn(agent: Agent, target: Agent, dialogue: string, simTime: number): boolean {
     const conv = agent.getActiveConversation()
-    if (!conv) return false
+    if (
+      !conv ||
+      agent.getConversationPartnerId() !== target.state.id ||
+      target.getConversationPartnerId() !== agent.state.id
+    ) return false
+
+    agent.state.path = []
+    agent.state.pathIndex = 0
+    target.state.path = []
+    target.state.pathIndex = 0
 
     const exchange: ConversationExchange = {
       speakerId: agent.state.id,
@@ -80,8 +101,8 @@ export class ConversationManager {
   }
 
   public closeConversation(agent: Agent, target: Agent): void {
-    agent.closeActiveConversation()
-    target.closeActiveConversation()
+    if (agent.getConversationPartnerId() === target.state.id) agent.closeActiveConversation()
+    if (target.getConversationPartnerId() === agent.state.id) target.closeActiveConversation()
   }
 
   public autoCloseInactiveConversations(agent: Agent, allAgents: Agent[], simTime: number): void {

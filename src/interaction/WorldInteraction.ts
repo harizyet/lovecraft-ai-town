@@ -79,14 +79,17 @@ export class WorldInteraction {
     const workEffects = this.getWorkEffects(building, agent)
     workEffects(agent)
 
+    // Reward agent with wealth for working (capped at 100)
+    agent.state.wealth = Math.min(100, agent.state.wealth + 10)
+
     this.eventBus.emit({
       type: 'work',
       agentId: agent.state.id,
       actionType: ActionType.WORK,
       outcome: 'worked',
-      description: `${agent.state.name} is working at ${building.name}`,
+      description: `${agent.state.name} is working at ${building.name} and earned 10 wealth`,
       causationIds: [],
-      worldStateDelta: {},
+      worldStateDelta: { wealth: agent.state.wealth },
       observers: [],
     })
   }
@@ -144,68 +147,6 @@ export class WorldInteraction {
     return false
   }
 
-  public handleBuild(
-    agent: Agent,
-    buildingType: BuildingType
-  ): boolean {
-    const bx = Math.round(agent.state.position.x)
-    const by = Math.round(agent.state.position.y)
-
-    if (!this.world.isWalkable(bx, by)) {
-      return false
-    }
-
-    const names: Record<BuildingType, string[]> = {
-      [BuildingType.HOME]: ['New Home', 'House', 'Apartment'],
-      [BuildingType.SHOP]: ['New Shop', 'Store'],
-      [BuildingType.TOWN_SQUARE]: ['Meeting Ground'],
-      [BuildingType.RESTAURANT]: ['New Restaurant', 'Cafe'],
-      [BuildingType.WORKSHOP]: ['Workshop', 'Repair Shop'],
-      [BuildingType.CHURCH]: ['Community Hall', 'Office'],
-      [BuildingType.PARK]: ['Garden', 'Plaza'],
-    }
-
-    const nameList = names[buildingType] ?? ['Structure']
-    const name = nameList[Math.floor(Math.random() * nameList.length)]
-    const size = { x: 3 + Math.floor(Math.random() * 3), y: 3 + Math.floor(Math.random() * 3) }
-
-    const building = {
-      id: `built_${Date.now()}_${agent.state.id}`,
-      type: buildingType,
-      position: { x: bx - Math.floor(size.x / 2), y: by - Math.floor(size.y / 2) },
-      size,
-      name,
-      description: `Built by ${agent.state.name}`,
-    }
-
-    this.world.buildings.set(building.id, building)
-
-    for (let dy = 0; dy < size.y; dy++) {
-      for (let dx = 0; dx < size.x; dx++) {
-        const tx = building.position.x + dx
-        const ty = building.position.y + dy
-        const tile = this.world.getTile(tx, ty)
-        if (tile) {
-          tile.type = TileType.BUILDING
-          tile.buildingId = building.id
-        }
-      }
-    }
-
-    this.eventBus.emit({
-      type: 'build',
-      agentId: agent.state.id,
-      actionType: ActionType.BUILD,
-      outcome: 'built',
-      description: `${agent.state.name} built ${name}`,
-      causationIds: [],
-      worldStateDelta: { newBuilding: building.id },
-      observers: [],
-    })
-
-    return true
-  }
-
   public getBuildingsNearAgent(
     agent: Agent,
     radius: number = 5
@@ -243,14 +184,18 @@ export class WorldInteraction {
     if (!job) return
 
     const buildingTypes: Record<string, string> = {
-      Teacher: 'home',
-      Mechanic: 'workshop',
-      'Retail Worker': 'shop',
-      'Police Officer': 'town_square',
-      Nurse: 'church',
-      Accountant: 'church',
-      Chef: 'restaurant',
-      Paramedic: 'park',
+      Blacksmith: 'smithy',
+      Carpenter: 'carpenter_workshop',
+      Merchant: 'market',
+      'Town Guard': 'guardhouse',
+      Healer: 'apothecary',
+      Steward: 'manor',
+      Innkeeper: 'tavern',
+      Farmer: 'farm',
+      Priest: 'church',
+      Prophet: 'church',
+      Knight: 'guardhouse',
+      Inquisitor: 'church',
     }
 
     const type = buildingTypes[job]
@@ -283,6 +228,7 @@ export class WorldInteraction {
   ): (agent: Agent) => void {
     switch (building.type) {
       case BuildingType.HOME:
+      case BuildingType.MANOR:
         return () => {
           agent.state.needs.energy = Math.min(100, agent.state.needs.energy + 20)
           agent.state.health = Math.min(
@@ -292,12 +238,14 @@ export class WorldInteraction {
         }
 
       case BuildingType.RESTAURANT:
+      case BuildingType.TAVERN:
         return () => {
           agent.state.needs.hunger = Math.min(100, agent.state.needs.hunger + 25)
           agent.state.needs.social = Math.min(100, agent.state.needs.social + 15)
         }
 
       case BuildingType.CHURCH:
+      case BuildingType.APOTHECARY:
         return () => {
           agent.state.health = Math.min(
             agent.state.maxHealth,
@@ -307,6 +255,8 @@ export class WorldInteraction {
         }
 
       case BuildingType.WORKSHOP:
+      case BuildingType.SMITHY:
+      case BuildingType.CARPENTER_WORKSHOP:
         return () => {
           const tool = {
             id: `tool_${Date.now()}`,
@@ -321,6 +271,8 @@ export class WorldInteraction {
         }
 
       case BuildingType.SHOP:
+      case BuildingType.MARKET:
+      case BuildingType.FARM:
         return () => {
           agent.state.needs.hunger = Math.min(100, agent.state.needs.hunger + 15)
         }

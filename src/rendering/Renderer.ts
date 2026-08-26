@@ -1,6 +1,20 @@
-import { TileType, BuildingType, SimulationConfig, DayNightCycle, AgentState, EmotionalState } from '@/types'
+import { TileType, BuildingType, SimulationConfig, DayNightCycle, AgentState, EmotionalState, WeatherState } from '@/types'
 import { World } from '@/world/World'
 import { Camera } from '@/rendering/Camera'
+import { getJobIcon } from '@/utils/JobIcons'
+
+interface RendererSimulationState {
+  paused: boolean
+  speedMultiplier: number
+  eventCount: number
+  rumourCount: number
+  rumourImpactCounts: Record<string, number>
+  llmQueries: { made: number; successful: number }
+  conversationChanceMultiplier: number
+  rumourPropagationMultiplier: number
+  inventedRumourProbability: number
+  rumourExtremeBeliefProbability: number
+}
 
 export class Renderer {
   private canvas: HTMLCanvasElement
@@ -45,6 +59,15 @@ export class Renderer {
       [BuildingType.WORKSHOP]: '#696969',
       [BuildingType.CHURCH]: '#deb887',
       [BuildingType.PARK]: '#6b8e23',
+      [BuildingType.SMITHY]: '#55504a',
+      [BuildingType.CARPENTER_WORKSHOP]: '#9a6b3f',
+      [BuildingType.MARKET]: '#b88632',
+      [BuildingType.GUARDHOUSE]: '#787878',
+      [BuildingType.APOTHECARY]: '#718c4b',
+      [BuildingType.MANOR]: '#aa8060',
+      [BuildingType.TAVERN]: '#7f4428',
+      [BuildingType.FARM]: '#8b7d3c',
+      [BuildingType.CULT_SHRINE]: '#4a1a5c',
     }
 
     this.emotionIcons = {
@@ -56,6 +79,10 @@ export class Renderer {
       [EmotionalState.EXCITED]: '',
       [EmotionalState.TIRED]: '',
       [EmotionalState.HUNGRY]: '',
+      [EmotionalState.PANICKED]: '',
+      [EmotionalState.GRIEVING]: '',
+      [EmotionalState.AMBIVALENT]: '',
+      [EmotionalState.DETERMINED]: '',
     }
 
     this.resize()
@@ -71,7 +98,12 @@ export class Renderer {
     this.selectedAgentId = id
   }
 
-  render(agents: AgentState[], dayNight: DayNightCycle): void {
+  render(
+    agents: AgentState[],
+    dayNight: DayNightCycle,
+    weather: WeatherState,
+    simulation: RendererSimulationState
+  ): void {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
     this.ctx.save()
@@ -79,11 +111,11 @@ export class Renderer {
     this.renderTiles()
     this.renderBuildings()
     this.renderDeadBodies(agents)
-    this.renderAgents(agents)
+    this.renderAgents(agents, simulation.rumourImpactCounts)
     this.ctx.restore()
 
     this.renderDayNightOverlay(dayNight)
-    this.renderHUD(agents, dayNight)
+    this.renderHUD(agents, dayNight, weather, simulation)
   }
 
   private applyCamera(): void {
@@ -151,13 +183,17 @@ export class Renderer {
         this.renderRoof(x, y, w, h)
       }
 
+      const labelHeight = Math.max(13, this.tileSize * 0.42)
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.68)'
+      this.ctx.fillRect(x + 2, y + h - labelHeight - 2, Math.max(0, w - 4), labelHeight)
       this.ctx.fillStyle = '#fff'
-      this.ctx.font = `${Math.max(10, this.tileSize * 0.3)}px sans-serif`
+      this.ctx.font = `${Math.max(9, this.tileSize * 0.27)}px sans-serif`
       this.ctx.textAlign = 'center'
       this.ctx.fillText(
         building.name,
         x + w / 2,
-        y - 5
+        y + h - 5,
+        Math.max(10, w - 8)
       )
     }
   }
@@ -175,7 +211,7 @@ export class Renderer {
 
   private renderDeadBodies(agents: AgentState[]): void {
     for (const agent of agents) {
-      if (agent.alive) continue
+      if (agent.alive || agent.exiled) continue
 
       const x = agent.position.x * this.tileSize
       const y = agent.position.y * this.tileSize
@@ -199,7 +235,7 @@ export class Renderer {
     }
   }
 
-  private renderAgents(agents: AgentState[]): void {
+  private renderAgents(agents: AgentState[], rumourImpactCounts: Record<string, number>): void {
     for (const agent of agents) {
       if (!agent.alive) continue
 
@@ -207,7 +243,7 @@ export class Renderer {
       const y = agent.position.y * this.tileSize
       const cx = x + this.tileSize / 2
       const cy = y + this.tileSize / 2
-      const r = this.tileSize * 0.35
+      const r = this.tileSize * (agent.demon ? 1.4 : 0.35)
 
       if (agent.id === this.selectedAgentId) {
         this.ctx.strokeStyle = '#ffd700'
@@ -217,23 +253,99 @@ export class Renderer {
         this.ctx.stroke()
       }
 
-      this.ctx.fillStyle = this.getAgentColor(agent)
-      this.ctx.beginPath()
-      this.ctx.arc(cx, cy, r, 0, Math.PI * 2)
-      this.ctx.fill()
-
-      this.ctx.strokeStyle = '#333'
-      this.ctx.lineWidth = 2
-      this.ctx.stroke()
+      if (agent.demon) this.renderDemon(cx, cy, r)
+      else {
+        this.ctx.fillStyle = this.getAgentColor(agent)
+        this.ctx.beginPath()
+        this.ctx.arc(cx, cy, r, 0, Math.PI * 2)
+        this.ctx.fill()
+        this.ctx.strokeStyle = '#333'
+        this.ctx.lineWidth = 2
+        this.ctx.stroke()
+      }
 
       this.ctx.fillStyle = '#fff'
       this.ctx.font = `bold ${Math.max(9, this.tileSize * 0.25)}px sans-serif`
       this.ctx.textAlign = 'center'
-      this.ctx.fillText(agent.name, cx, y - 5)
+      this.ctx.fillText(agent.name, cx, agent.demon ? cy - r - 8 : y - 5)
 
       this.renderHealthBar(agent, x, y)
       this.renderEmotionIcon(agent, cx, y)
+      this.renderJobIcon(cx, cy, r, agent.currentJob)
+      const rumourCount = rumourImpactCounts[agent.id] ?? 0
+      if (rumourCount > 0) this.renderRumourImpactIcon(cx, cy, r, rumourCount)
     }
+  }
+
+  private renderJobIcon(cx: number, cy: number, agentRadius: number, job: string | undefined): void {
+    const iconX = cx - agentRadius - 5
+    const iconY = cy + agentRadius + 5
+    const iconRadius = 8
+
+    this.ctx.fillStyle = 'rgba(20, 20, 20, 0.75)'
+    this.ctx.beginPath()
+    this.ctx.arc(iconX, iconY, iconRadius, 0, Math.PI * 2)
+    this.ctx.fill()
+
+    this.ctx.font = '11px sans-serif'
+    this.ctx.textAlign = 'center'
+    this.ctx.textBaseline = 'middle'
+    this.ctx.fillText(getJobIcon(job), iconX, iconY)
+    this.ctx.textBaseline = 'alphabetic'
+  }
+
+  private renderDemon(cx: number, cy: number, r: number): void {
+    const gradient = this.ctx.createRadialGradient(cx, cy, r * 0.25, cx, cy, r)
+    gradient.addColorStop(0, '#d32f2f')
+    gradient.addColorStop(0.65, '#5b0000')
+    gradient.addColorStop(1, '#160000')
+    this.ctx.fillStyle = gradient
+    this.ctx.beginPath()
+    this.ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    this.ctx.fill()
+    this.ctx.strokeStyle = '#ff3d00'
+    this.ctx.lineWidth = 3
+    this.ctx.stroke()
+
+    this.ctx.fillStyle = '#130707'
+    this.ctx.beginPath()
+    this.ctx.moveTo(cx - r * 0.65, cy - r * 0.55)
+    this.ctx.lineTo(cx - r * 0.95, cy - r * 1.05)
+    this.ctx.lineTo(cx - r * 0.2, cy - r * 0.72)
+    this.ctx.moveTo(cx + r * 0.65, cy - r * 0.55)
+    this.ctx.lineTo(cx + r * 0.95, cy - r * 1.05)
+    this.ctx.lineTo(cx + r * 0.2, cy - r * 0.72)
+    this.ctx.fill()
+
+    this.ctx.fillStyle = '#ffd600'
+    this.ctx.beginPath()
+    this.ctx.ellipse(cx - r * 0.3, cy - r * 0.15, r * 0.14, r * 0.07, 0, 0, Math.PI * 2)
+    this.ctx.ellipse(cx + r * 0.3, cy - r * 0.15, r * 0.14, r * 0.07, 0, 0, Math.PI * 2)
+    this.ctx.fill()
+  }
+
+  private renderRumourImpactIcon(cx: number, cy: number, agentRadius: number, count: number): void {
+    const iconX = cx + agentRadius + 5
+    const iconY = cy - agentRadius - 7
+    const iconRadius = 8
+
+    this.ctx.fillStyle = '#8e44ad'
+    this.ctx.beginPath()
+    this.ctx.arc(iconX, iconY, iconRadius, 0, Math.PI * 2)
+    this.ctx.fill()
+    this.ctx.beginPath()
+    this.ctx.moveTo(iconX - 4, iconY + 6)
+    this.ctx.lineTo(iconX - 7, iconY + 11)
+    this.ctx.lineTo(iconX + 1, iconY + 7)
+    this.ctx.closePath()
+    this.ctx.fill()
+
+    this.ctx.fillStyle = '#fff'
+    this.ctx.font = 'bold 10px sans-serif'
+    this.ctx.textAlign = 'center'
+    this.ctx.textBaseline = 'middle'
+    this.ctx.fillText(count > 1 ? String(count) : '!', iconX, iconY)
+    this.ctx.textBaseline = 'alphabetic'
   }
 
   private renderEmotionIcon(agent: AgentState, cx: number, y: number): void {
@@ -246,6 +358,10 @@ export class Renderer {
       [EmotionalState.EXCITED]: { text: '', color: '#ff9800' },
       [EmotionalState.TIRED]: { text: '', color: '#607d8b' },
       [EmotionalState.HUNGRY]: { text: '', color: '#795548' },
+      [EmotionalState.PANICKED]: { text: '', color: '#e040fb' },
+      [EmotionalState.GRIEVING]: { text: '', color: '#3949ab' },
+      [EmotionalState.AMBIVALENT]: { text: '', color: '#9e9e9e' },
+      [EmotionalState.DETERMINED]: { text: '', color: '#00bfa5' },
     }
 
     const emotion = labels[agent.emotionalState]
@@ -261,6 +377,7 @@ export class Renderer {
   }
 
   private getAgentColor(agent: AgentState): string {
+    if (agent.demon) return '#7f0000'
     const colors = [
       '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4',
       '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd',
@@ -291,99 +408,55 @@ export class Renderer {
     }
   }
 
-  private renderHUD(agents: AgentState[], dayNight: DayNightCycle): void {
+  private renderHUD(
+    agents: AgentState[],
+    dayNight: DayNightCycle,
+    weather: WeatherState,
+    simulation: RendererSimulationState
+  ): void {
     const padding = 15
     const lineHeight = 18
-    const panelWidth = 280
-
-    let panelHeight = 140
-
-    this.ctx.fillStyle = '#fff'
-    this.ctx.font = '13px sans-serif'
-    this.ctx.textAlign = 'left'
-
+    const panelWidth = 390
+    const panelHeight = 240
     const timeStr = `${dayNight.hour.toString().padStart(2, '0')}:${Math.floor(dayNight.minute).toString().padStart(2, '0')}`
-    let y = padding + 20
-    this.ctx.fillText(`Day ${dayNight.day}  |  ${timeStr}  |  ${dayNight.isDaytime ? 'Daytime' : 'Nighttime'}`, padding + 10, y)
-    y += lineHeight
-
     const alive = agents.filter((a) => a.alive).length
     const dead = agents.filter((a) => !a.alive).length
-    this.ctx.fillText(`Agents: ${alive} alive, ${dead} dead`, padding + 10, y)
-    y += lineHeight
-
-    let reasoningText = ''
-    if (this.selectedAgentId) {
-      const selected = agents.find((a) => a.id === this.selectedAgentId)
-      if (selected) {
-        this.ctx.fillStyle = '#ffd700'
-        this.ctx.fillText(`Selected: ${selected.name}`, padding + 10, y)
-        y += lineHeight
-        this.ctx.fillStyle = '#fff'
-        this.ctx.fillText(
-          `HP: ${selected.health}/${selected.maxHealth}  Hunger: ${Math.round(selected.needs.hunger)}  Energy: ${Math.round(selected.needs.energy)}`,
-          padding + 10,
-          y
-        )
-        y += lineHeight
-        this.ctx.fillText(
-          `Social: ${Math.round(selected.needs.social)}  Emotion: ${selected.emotionalState}`,
-          padding + 10,
-          y
-        )
-        y += lineHeight
-        reasoningText = selected.lastReasoning
-      }
-    }
-
-    if (reasoningText) {
-      panelHeight += this.wrapTextHeight(reasoningText, panelWidth - 20, lineHeight) + lineHeight + 10
-    }
 
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
     this.ctx.fillRect(padding, padding, panelWidth, panelHeight)
-
-    if (reasoningText) {
-      y = padding + 20
-      this.ctx.fillStyle = '#fff'
-      this.ctx.font = '13px sans-serif'
-      this.ctx.textAlign = 'left'
-
-      this.ctx.fillText(`Day ${dayNight.day}  |  ${timeStr}  |  ${dayNight.isDaytime ? 'Daytime' : 'Nighttime'}`, padding + 10, y)
-      y += lineHeight
-
-      this.ctx.fillText(`Agents: ${alive} alive, ${dead} dead`, padding + 10, y)
-      y += lineHeight
-
-      const selected = agents.find((a) => a.id === this.selectedAgentId)
-      if (selected) {
-        this.ctx.fillStyle = '#ffd700'
-        this.ctx.fillText(`Selected: ${selected.name}`, padding + 10, y)
-        y += lineHeight
-        this.ctx.fillStyle = '#fff'
-        this.ctx.fillText(
-          `HP: ${selected.health}/${selected.maxHealth}  Hunger: ${Math.round(selected.needs.hunger)}  Energy: ${Math.round(selected.needs.energy)}`,
-          padding + 10,
-          y
-        )
-        y += lineHeight
-        this.ctx.fillText(
-          `Social: ${Math.round(selected.needs.social)}  Emotion: ${selected.emotionalState}`,
-          padding + 10,
-          y
-        )
-        y += lineHeight + 5
-
-        this.ctx.fillStyle = '#aaa'
-        this.ctx.font = '11px sans-serif'
-        this.ctx.fillText('Thinking:', padding + 10, y)
-        y += 14
-
-        this.ctx.fillStyle = '#e0e0e0'
-        this.ctx.font = '12px sans-serif'
-        this.wrapText(reasoningText, padding + 10, y, panelWidth - 20, lineHeight)
-      }
-    }
+    this.ctx.strokeStyle = 'rgba(150, 206, 180, 0.65)'
+    this.ctx.strokeRect(padding, padding, panelWidth, panelHeight)
+    this.ctx.textAlign = 'left'
+    this.ctx.font = 'bold 14px sans-serif'
+    this.ctx.fillStyle = '#96ceb4'
+    let y = padding + 22
+    this.ctx.fillText('World State', padding + 10, y)
+    this.ctx.font = '13px sans-serif'
+    this.ctx.fillStyle = '#fff'
+    y += lineHeight
+    this.ctx.fillText(`Day ${dayNight.day}  |  ${timeStr}  |  ${dayNight.isDaytime ? 'Daytime' : 'Nighttime'}`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`Brightness: ${Math.round(dayNight.brightness * 100)}%`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`Weather: ${weather.condition}  |  ${weather.temperatureC}°C${weather.hazardousOutdoors ? '  |  Hazardous' : ''}`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`Population: ${alive} alive, ${dead} dead  |  Buildings: ${this.world.buildings.size}`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`Events: ${simulation.eventCount}  |  Rumours: ${simulation.rumourCount}`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillStyle = simulation.paused ? '#ffb74d' : '#81c784'
+    this.ctx.fillText(`Simulation: ${simulation.paused ? 'Paused' : 'Running'}  |  Speed: ${simulation.speedMultiplier}x`, padding + 10, y)
+    this.ctx.fillStyle = '#fff'
+    y += lineHeight
+    this.ctx.fillText(`Unfamiliar greeting chance: ${Math.min(100, 35 * Math.max(0, simulation.conversationChanceMultiplier)).toFixed(0)}% (${simulation.conversationChanceMultiplier}x)`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`Rumour propagation/conversation: ${Math.max(0, simulation.rumourPropagationMultiplier).toFixed(1)}x`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`Invented rumour chance: ${(Math.max(0, Math.min(1, simulation.inventedRumourProbability)) * 100).toFixed(0)}%`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`Extreme belief/denial chance: ${(Math.max(0, Math.min(1, simulation.rumourExtremeBeliefProbability)) * 100).toFixed(0)}%`, padding + 10, y)
+    y += lineHeight
+    this.ctx.fillText(`LLM queries: ${simulation.llmQueries.made}  |  Successful: ${simulation.llmQueries.successful}`, padding + 10, y)
   }
 
   private wrapText(text: string, x: number, y: number, maxWidth: number, lineHeight: number): void {

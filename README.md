@@ -2,86 +2,136 @@
 
 ![AITown](ai-town.png)
 
-> ## ⚠️ WARNING: DO NOT USE WITH PAID LLM SERVICES ⚠️
->
-> This project makes an LLM API call **every ~1 second per agent**. With 8 agents (the default), that's **~690,000 API calls per day**. Pointing this at any paid LLM service (OpenAI, Anthropic, Google, etc.) will rack up a significant bill very quickly. **Only use with a local, free LLM** such as LM Studio or Ollama.
+> ## LLM Usage & Decisions
+> Agent decisions are event-driven. Each agent requests a daily schedule once at the start of a simulated day, then requests a new decision only when a task block completes, another person comes into close proximity or interacts with them, or they witness a notable world event. LLM requests are serialized; a failed request retries immediately and blocks later requests so queued events remain ordered. Rendering and movement ticks do not call the LLM. Usage still depends on agent count, event frequency, and retries, so monitor costs when using a paid service.
 
 A 2D simulated town where LLM-powered AI agents live, interact, make decisions, and cause real-world consequences. Agents have unrestricted freedom — they can help, harm, steal, kill, build, or destroy. All actions are logged with full causation chains.
 
-## Features
+---
 
-- **Procedural world generation** — 60x40 tile map with roads, water clusters, trees, and 8 buildings
-- **LLM-driven agents** — Each agent has personality, needs, memory, relationships, and autonomy
-- **Full interaction system** — Attack, steal, help, flee, converse, build, destroy, gather, work
-- **Death & consequences** — Agents die, bodies remain, witnesses react, gossip spreads, reputations shift
-- **Day/night cycle** — Smooth transitions with visual overlay
-- **Debug overlay** — F1 to toggle event log, agent states, world stats
-- **Log export** — Download full event history as JSON or CSV
-- **Zero runtime dependencies** — Pure TypeScript, Canvas API, custom A* pathfinding
+## 🌟 Features
 
-## Quick Start
+### 🏰 World & Vocation System
+* **Procedural World Generation** — A 60x40 tile grid map with roads, water clusters, trees, and 8+ buildings featuring a two-tile clearance footprint and road-side collision alignment.
+* **Medieval Jobs & Workplaces** — Agents are assigned to realistic medieval vocations (e.g., Blacksmith at the smithy, Carpenter at the carpenter's workshop, Merchant at the market, Town Guard at the guardhouse, Healer at the apothecary, Steward at the manor, Innkeeper at the tavern, Farmer at the farm, Priest at the church).
+* **Inactivity Watchdog** — Tracks and resolves agent inactivity; if an agent is stuck or idle for 15 simulated minutes, it triggers an `idle_recovery` pathfinding action to find nearby agents for conversation or fall back to useful work.
+
+### 🗣️ Rumours, Whispers & Belief Dynamics
+* **Organic Rumour Propagation** — Significant events (theft, injuries, deaths, property damage) seed natural rumours. Agents share unverified claims during dialogue.
+* **Corroboration & Credibility** — Multi-source tracking adjusts credibility based on speaker reputation. Semantically related claims naming the same agent, building, or event corroborate each other, reinforcing personal belief stances.
+* **Extreme Belief Bias** — Controlled by `rumourExtremeBeliefProbability`, exposing agents to immediate full belief or denial of claims. Direct whispers seed locked believer stances, except for atheists who reject whispers.
+* **Prophets & Divine Revelations** — The first agent to accept a direct divine whisper changes their vocation to a **Prophet**. They receive daily LLM-generated prophetic revelations, command executable tasks (e.g., sacrifice, warn, convert), and found cults.
+* **Faith & Atheism** — Agents track faith levels and deity confidence. The town begins with at least one atheist (capped faith) who resists preaching/recruitment, while others can convert, grow in faith, or lose faith.
+
+### 👿 Cults, Rituals & Demonic Forces
+* **Cult Mechanics & Shrines** — Cult leaders recruit members (`form_cult`), who gain specialized tasks (`pray`, `heal`, `bless`, `curse`, `resurrect`). Leaders deterministicly build physical shrines near them, directing cult sermons and rites to that preferred location.
+* **Demonic Summoning** — Cult leaders lead collective summoning rites, gathering fellow members to generate a Demon summon charge. Summoned Demons are invulnerable (666 HP, ignoring ordinary damage) and pursue user-defined attack or travel commands.
+* **Permanent Insanity** — Witnessing Demon manifestations or targeted divine actions can drive non-cultist/nonbelieving agents permanently insane, forcing panicked and erratic behaviors that persist through saves and reloads.
+* **Corruption Twists** — Direct whispers to a Priest can corrupt them, making them a hidden Prophet/cult leader. They rename their congregation to evoke ancient, inhuman deities while retaining their public Priest facade to avoid suspicion.
+* **Defection & Mobs** — Disillusioned members defect, becoming enemies of their former cult and potentially forming anti-cult groups. High-aggression cults can form mobs to hunt down and attack nonbelievers.
+
+### ⚖️ Justice & Politics
+* **Resolution Courts** — When a rumour reaches everyone in town (or an authority override triggers), the village gathers at the town square for a trial. The accused delivers an LLM defense, and villagers vote to **Absolve**, **Exile** (inactive/hidden state), or **Execute** (permanent death).
+* **Political Camps (Gentry vs. Commons)** — Agents are split into wealth-ranked political camps. A Steward or high-reputation villager periodically calls town assemblies to vote on economic policies (boosting specific jobs with wealth) or banishing Knights/Inquisitors.
+* **Office of the Alderman** — If a cult leader converts the entire village, they can run for Alderman (requiring a unanimous vote). Seating them grants absolute decree power, overriding court majority votes and assembly policies.
+* **Escalating Outsider Forces** — External threats trigger arrival events: **Knights** (`🛡`) arrive at the border to investigate after two non-exile deaths; **Inquisitors** (`⚖`) arrive to combat cults if a Priest confirms multiple cultist identities.
+
+### 🖥️ Interface & Debugging
+* **Rumour & Belief Tracker** — A collapsible left-side HUD displaying active/archived claims, reach, source credibility, individual agent stances, and a live timeline of private thoughts.
+* **Visual Role Badges** — Agent overlays and lists display unique icons for Prophets (`✦`), Knights (`🛡`), Inquisitors (`⚖`), and Demons (`☠`).
+* **Detailed Agent Inspect Tool** — Full state inspector showcasing needs, personality, memory summaries, active behaviors, and relationship charts.
+* **Simulation controls** — Speed adjustment, pause/resume (Space), day/night lighting filter overlay, and F1 Debug console.
+* **Log export** — Expose and download all simulated events with causation chains as JSON/CSV.
+
+---
+
+## 🛠️ Tech Stack
+
+* **TypeScript 6.0 + Vite 8** — Fast compilation and development iteration.
+* **Canvas API** — Lightweight 2D engine without heavy third-party graphics libraries.
+* **OpenAI-Compatible API Interface** — Built to interact with local LLMs (e.g., LM Studio, Ollama).
+* **Custom A\* Pathfinding** — 4-directional Manhattan pathfinder with smooth interpolation.
+* **Zero Runtime Dependencies** — Clean, performant implementation.
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
-1. **Local LLM server** running on `localhost:1234` (LM Studio recommended, OpenAI-compatible API)
+1. **Local LLM server** running (LM Studio or OpenAI-compatible endpoint).
 2. **Node.js 18+**
 
-### Setup
-
+### Installation
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local Vite URL in your browser. The simulation starts immediately with 8 agents in a procedurally generated town.
+Open the local Vite URL (e.g., `http://localhost:5173`) in your browser to start the simulation.
 
-### Configuration
+---
 
-Edit `src/main.ts` to change settings:
+## ⚙️ Configuration
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `llmEndpoint` | `http://localhost:1234` | LLM server URL |
-| `llmModel` | `llama3` | Model name |
-| `agentCount` | `8` | Number of agents |
-| `mapWidth` / `mapHeight` | `60` / `40` | Tile grid size |
-| `tickRate` | `16` | ms per frame (~60 FPS) |
-| `decisionInterval` | `1000` | ms between LLM decision calls |
-| `memoryBufferSize` | `25` | Events kept in recent memory |
+Modify config parameters in [src/main.ts](file:///home/hariz/village/ai-town/src/main.ts):
 
-## Controls
+| Setting | Default / Value | Description |
+|---------|-----------------|-------------|
+| `llmEndpoint` | `'http://10.180.1.54:8000'` | LLM Server completions endpoint |
+| `llmModel` | `'OpenVINO/Qwen2.5-1.5B-Instruct-int4-ov'` | LLM model identifier |
+| `agentCount` | `10` | Number of living agents initialized |
+| `mapWidth` / `mapHeight` | `60` / `40` | Grid tile dimensions |
+| `tileSize` | `32` | Grid size in pixels |
+| `conversationChanceMultiplier` | `2` | Multiplier for greeting unfamiliar agents |
+| `rumourPropagationMultiplier` | `2` | Scales rumor-driven encounter probability & mutations |
+| `inventedRumourProbability` | `0.01` | Probability of conversation creating a new rumor |
+| `rumourExtremeBeliefProbability` | `0.2` | Chance of locking into full belief/denial on first exposure |
+| `memoryBufferSize` | `25` | Number of events preserved in recent memory |
+
+---
+
+## 🎮 Controls
 
 | Key | Action |
 |-----|--------|
-| WASD / Arrows | Pan camera |
-| + / - | Zoom in / out |
-| 1-9 | Follow agent by index |
-| Space | Pause / resume |
-| F1 | Toggle debug overlay |
-| Click | Select agent |
+| **WASD / Arrows** | Pan camera |
+| **+ / -** | Zoom in / out |
+| **1-9** | Follow agent by index |
+| **Space** | Pause / resume simulation |
+| **F1** | Toggle debug overlay |
+| **Click** | Select agent to inspect |
 
-## Architecture
+---
+
+## 📐 Architecture & Structure
 
 ```
-SimulationManager (game loop)
-  ├── World (tile grid, buildings, procedural generation)
-  ├── AgentManager (agent orchestration + LLM decisions)
-  │     ├── Agent (state, movement, memory, personality)
-  │     ├── AIProvider (LLM HTTP client)
-  │     ├── AgentInteraction (attack, steal, help, conversation)
-  │     ├── WorldInteraction (build, destroy, work, gather)
-  │     └── AStarPathfinder (navigation)
-  ├── Renderer (Canvas 2D)
-  ├── Camera (pan/zoom/follow)
-  ├── DebugOverlay (F1 panel)
-  └── EventBus (event pub/sub)
+ai-town/
+├── src/
+│   ├── types/
+│   │   └── index.ts                   # Shared TypeScript interfaces & types
+│   ├── world/
+│   │   └── World.ts                   # Grid generation, buildings & clearance logic
+│   ├── agent/
+│   │   ├── Agent.ts                   # Individual agent parameters, needs, traits, memory
+│   │   └── AgentManager.ts            # Simulation orchestration, schedules, agendas & LLM parsing
+│   ├── ai/
+│   │   ├── AIProvider.ts              # OpenAI HTTP client & markdown stripping
+│   │   └── PromptBuilder.ts           # Prompt engineering and instruction building
+│   ├── simulation/
+│   │   └── SimulationManager.ts       # Central game loop, tick updates & weather
+│   ├── rendering/
+│   │   ├── Renderer.ts                # Canvas 2D engine, text tags & overlay filters
+│   │   ├── Camera.ts                  # Target tracking & interpolation
+│   │   └── DebugOverlay.ts            # Sidebar debug, whispers & JSON/CSV log export
+│   ├── interaction/
+│   │   ├── EventBus.ts                # Wildcard-supported pub/sub dispatcher
+│   │   ├── AgentInteraction.ts        # Direct interactions (help, attack, steal, etc.)
+│   │   ├── ConversationManager.ts     # Conversation state machine
+│   │   └── WorldInteraction.ts        # Structural world actions (harvest, work, build shrine)
+│   ├── utils/
+│   │   └── AStarPathfinder.ts         # Pathfinding implementation
+│   └── main.ts                        # Main launcher and config setup
 ```
 
-See [AGENTS.md](./AGENTS.md) for detailed technical documentation.
-
-## Tech Stack
-
-- TypeScript 6.0 + Vite 8
-- Canvas API (no graphics library)
-- LM Studio / OpenAI-compatible API
-- Custom A* pathfinding
+Refer to [SOCIAL.md](./SOCIAL.md) and [AGENTS.md](./AGENTS.md) for deeper implementation and feature documentation.
