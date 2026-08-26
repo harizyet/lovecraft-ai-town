@@ -5,8 +5,10 @@ import { AIProvider, PropheticTask } from '@/ai/AIProvider'
 import { PromptBuilder } from '@/ai/PromptBuilder'
 import { EventBus } from '@/interaction/EventBus'
 import { AgentInteraction } from '@/interaction/AgentInteraction'
+import { WorldInteraction } from '@/interaction/WorldInteraction'
 import { ConversationManager } from '@/interaction/ConversationManager'
 import {
+  ActionType,
   AgentAction,
   AgentState,
   Building,
@@ -18,6 +20,7 @@ import {
   LLMRequestStatus,
   Rumour,
   RumourProvenance,
+  ScheduleBlock,
   StoryMomentKind,
   WeatherCondition,
 } from '@/types'
@@ -77,6 +80,7 @@ export interface SystemDeps {
   simManager: SimulationManager
   story: StoryDeps
   agentInteraction: AgentInteraction
+  worldInteraction: WorldInteraction
   conversationManager: ConversationManager
 
   activeBlocks: Map<string, ActiveBlockEntry>
@@ -88,6 +92,7 @@ export interface SystemDeps {
   llmRequestStatuses: Map<string, LLMRequestStatus>
   rumours: Map<string, Rumour>
   getCurrentDay(): number
+  setCurrentDay(day: number): void
   isLLMRequestInFlight(): boolean
   setLLMRequestInFlight(value: boolean): void
 
@@ -212,4 +217,44 @@ export interface SystemDeps {
   findAgentByName(targetName: string, candidates: Agent[]): Agent | undefined
   formatAbsoluteMinute(minute: number): string
   findTownEntrance(): { x: number; y: number }
+
+  // Social subsystem (SocialSystem.ts).
+  lastActions: Map<string, { action: string; timestamp: number }>
+  hasRumourPropagationOpportunity(a: Agent, b: Agent): boolean
+  buildRumourConversationContext(agent: Agent, otherAgentId: string | null): string
+  maybeAddRumourToConversation(agent: Agent, partner: Agent, decision: AgentAction): void
+  getActiveCourtRumourId(): string | null
+  getRemainingSchedule(agentId: string): DailySchedule | undefined
+
+  // Schedule subsystem (ScheduleSystem.ts).
+  executeLLMDecision(agent: Agent, decision: AgentAction, causationIds?: string[]): string
+  ensureBelieverPrayerBlock(agent: Agent, blocks: ScheduleBlock[], minuteOfDay: number): ScheduleBlock[]
+  findCultShrine(cultId: string): Building | undefined
+  isVisibleCultActivity(action: string): boolean
+  hasNearbyPriest(agent: Agent): boolean
+  formCult(prophet: Agent, task: PropheticTask, causationId: string): void
+  gatherCultForSummoning(leader: Agent, action: AgentAction): void
+  getSummoningParticipantSlot(site: { x: number; y: number }, index: number): { x: number; y: number }
+  advanceSummoningProcess(leader: Agent, active: ActiveBlockEntry, now: number): boolean
+  getSummoningBuildingCenter(building: Building): { x: number; y: number }
+  completeCultAbility(agent: Agent, action: AgentAction, causationId: string): void
+  completeCultShrineConstruction(leader: Agent, causationId: string): void
+  attemptCultRecruitment(prophet: Agent, target: Agent, task: PropheticTask, causationId: string): void
+  coordinateScheduledSummons(): void
+  isAgentUndecidedAboutRumour(agentId: string, rumourId: string): boolean
+  isRumourUnresolved(rumourId: string): boolean
+  prepareInvestigationDecision(agent: Agent, decision: AgentAction, rumour: Rumour, authority: string): void
+  completeAffiliationInterrogation(interrogator: Agent, action: AgentAction, causationId: string): void
+  completeRumourInvestigation(rumourId: string, agent: Agent, causationId: string): string | undefined
+  canAttemptCultBribery(briber: Agent, target: Agent): boolean
+  attemptCultBribery(briber: Agent, target: Agent, reasoning: string, causationId: string): void
+  attemptFavorBribery(briber: Agent, target: Agent, reasoning: string, causationId: string): void
+  resetCrossSystemStateForRefresh(): void
+  canPriestCallInquisitor(priest: Agent): boolean
+  isInquisitorOutsiderSpawned(): boolean
+  findNearestAvailableSocialTarget(agent: Agent): Agent | undefined
+  bumpQueryEpoch(): number
+
+  // Decision engine subsystem (DecisionEngine.ts).
+  logAction(agent: Agent, actionType: ActionType, targetId: string | null, description: string, causationIds: string[]): string
 }
