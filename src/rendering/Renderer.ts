@@ -516,7 +516,7 @@ export class Renderer {
     const padding = 15
     const lineHeight = 18
     const panelWidth = 390
-    const panelHeight = 276
+    const panelHeight = 222
     const timeStr = `${dayNight.hour.toString().padStart(2, '0')}:${Math.floor(dayNight.minute).toString().padStart(2, '0')}`
     const alive = agents.filter((a) => a.alive).length
     const dead = agents.filter((a) => !a.alive).length
@@ -546,14 +546,6 @@ export class Renderer {
     this.ctx.fillStyle = simulation.paused ? '#ffb74d' : '#81c784'
     this.ctx.fillText(`Simulation: ${simulation.paused ? 'Paused' : 'Running'}  |  Speed: ${simulation.speedMultiplier}x`, padding + 10, y)
     this.ctx.fillStyle = '#fff'
-    y += lineHeight
-    this.ctx.fillText(`Unfamiliar greeting chance: ${Math.min(100, 35 * Math.max(0, simulation.conversationChanceMultiplier)).toFixed(0)}% (${simulation.conversationChanceMultiplier}x)`, padding + 10, y)
-    y += lineHeight
-    this.ctx.fillText(`Rumour propagation/conversation: ${Math.max(0, simulation.rumourPropagationMultiplier).toFixed(1)}x`, padding + 10, y)
-    y += lineHeight
-    this.ctx.fillText(`Invented rumour chance: ${(Math.max(0, Math.min(1, simulation.inventedRumourProbability)) * 100).toFixed(0)}%`, padding + 10, y)
-    y += lineHeight
-    this.ctx.fillText(`Extreme belief/denial chance: ${(Math.max(0, Math.min(1, simulation.rumourExtremeBeliefProbability)) * 100).toFixed(0)}%`, padding + 10, y)
     y += lineHeight
     this.ctx.fillText(`LLM queries: ${simulation.llmQueries.made}  |  Successful: ${simulation.llmQueries.successful}`, padding + 10, y)
     y += lineHeight

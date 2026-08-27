@@ -155,6 +155,9 @@ Write up to ${remainingTurns} more turns continuing this conversation, alternati
 
   public buildDailySchedulePrompt(agent: Agent, allAgents: Agent[], day: number, minuteOfDay: number): string {
     const state = agent.state
+    const home = agent.getWorld().getBuildings().find((b) => b.id === state.homeId)
+    const homeName = home ? home.name : 'your home'
+
     return `Plan day ${day} from ${this.formatTime(minuteOfDay)} onward.
 
 ${agent.getObservations(allAgents)}
@@ -166,11 +169,12 @@ Your job: ${state.currentJob ?? 'none'}
 ${state.currentJob === 'Prophet' ? `PROPHETIC VOCATION: You no longer perform secular job work. Every productive block must directly serve divine or cult responsibilities through pray, preach, ritual, conjure, summon, heal, bless, curse, resurrect, invite_cult, build_shrine, investigation of a revelation, or travel/talk that explicitly supports one of those purposes. You may still schedule essential eating, rest, sleep, personal safety, and emergency response. ${state.cult ? `Lead and expand ${state.cult.name}.` : 'Prioritize forming and organizing a cult when a revelation calls for it.'}` : ''}
 ${state.secretProphet ? `SECRET PROPHET: Schedule a normal day as the village Priest -- services, counsel, prayer at the church -- to keep your cover intact. Weave your true responsibilities to ${state.cult?.name ?? 'your hidden congregation'} (preach, ritual, invite_cult, build_shrine) in only where they can plausibly pass as ordinary priestly duty; never schedule anything that would announce your true allegiance to the village.` : ''}
 ${state.cult && (state.cult.role === 'leader' || state.cult.role === 'founder') ? `As the leader of ${state.cult.name}, you trust your own converted members. Do not write reasoning that treats a loyal member you personally recruited as a suspect to investigate, surveil, or "confirm the status of" — write surveillance or evidence-gathering reasoning only about someone who is not in your cult, or about a member whose actual defection, betrayal, or hostile act you recall from memory.` : ''}
+Your home building: ${homeName}
 Your hunger: ${state.needs.hunger.toFixed(0)}/100 (0 is full, 100 is starving)
 Your energy: ${state.needs.energy.toFixed(0)}/100
 Your social need: ${state.needs.social.toFixed(0)}/100
 Your current emotional state: ${state.emotionalState}
-${agent.isInsane() ? `INSANITY: You are insane (severe low sanity or permanent insanity). Your thoughts are fractured, panicked, erratic, or obsessive. Your schedule must reflect this mental instability. You should NOT plan routine tasks like working, eating, or sleeping normally. Instead, schedule actions that reflect your madness, such as wandering, praying/preaching obsessively, ranting, talking to yourself, or idling in confusion. Self-destruction/suicide (attacking yourself) is a potential, though rare, outcome you might contemplate.` : this.formatExistentialSchedule(state)}
+${agent.isInsane() ? `INSANITY: You are insane (severe low sanity or permanent insanity). Your thoughts are fractured, panicked, erratic, or obsessive. Your schedule must reflect this mental instability. You should NOT plan routine tasks like working, eating, or sleeping normally. Instead, schedule actions that reflect your madness, such as wandering, praying/preaching obsessively, ranting, talking to yourself, or idling in confusion. Self-destruction/suicide (attacking yourself) is a potential, though rare, outcome you might contemplate.` : `NIGHTTIME SLEEP: Nighttime is between 20:00 and 06:00. Unless you are insane, you MUST prioritize and schedule a continuous block of at least 5-6 hours (300-360 minutes) of sleep (action "sleep") at your home (${homeName}) during these hours (e.g. from 23:00 to 05:00, or 00:00 to 06:00). Do not plan secular work or active chores during late night hours.`}
 ${this.formatSanity(state)}
 Your personality: aggression ${state.personality.aggression.toFixed(1)}, friendliness ${state.personality.friendliness.toFixed(1)}, curiosity ${state.personality.curiosity.toFixed(1)}, caution ${state.personality.caution.toFixed(1)}, ambition ${state.personality.ambition.toFixed(1)}, creativity ${state.personality.creativity.toFixed(1)}.
 Your religious stance: ${state.beliefSystem.religiousStance}. Faith: ${state.beliefSystem.faith.toFixed(0)}/100.${state.beliefSystem.deities.length > 0 ? ` Deity beliefs: ${state.beliefSystem.deities.map((deity) => `${deity.name} (${deity.confidence.toFixed(0)}%)`).join(', ')}.` : ' You have no named deity belief yet.'}

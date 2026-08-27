@@ -1,5 +1,5 @@
 import { Agent } from '@/agent/Agent'
-import { ActionType, AgentAction, Building, BuildingType, DailySchedule, EmotionalState } from '@/types'
+import { ActionType, AgentAction, Building, BuildingType, DailySchedule, EmotionalState, ScheduleBlock } from '@/types'
 import { PropheticTask } from '@/ai/AIProvider'
 import { MIN_BRIBE_WEALTH } from './PoliticalSystem'
 import { ActiveBlockEntry, SystemDeps } from './SystemDeps'
@@ -80,7 +80,8 @@ export class ScheduleSystem {
         if (this.state.activeBlocks.get(agent.state.id)?.fallback) {
           this.state.activeBlocks.delete(agent.state.id)
         }
-        const repairedBlocks = this.deps.ensureBelieverPrayerBlock(agent, blocks, minuteOfDay)
+        const prayerRepaired = this.deps.ensureBelieverPrayerBlock(agent, blocks, minuteOfDay)
+        const repairedBlocks = this.ensureNightSleepBlock(agent, prayerRepaired, minuteOfDay)
         this.state.dailySchedules.set(agent.state.id, { day: plannedDay, blocks: repairedBlocks })
         this.state.scheduleCursors.set(agent.state.id, 0)
         this.deps.coordinateScheduledSummons()
@@ -785,5 +786,72 @@ export class ScheduleSystem {
       observers: [agent.state.id],
     })
     agent.addRecentMemory(event)
+  }
+
+  public ensureNightSleepBlock(agent: Agent, blocks: ScheduleBlock[], minuteOfDay: number): ScheduleBlock[] {
+    if (agent.isInsane()) return blocks
+
+    const home = this.deps.findBuildingOfType(agent, 'home')
+    const targetHomeName = home?.name ?? null
+
+    const sleep1Start = Math.max(0, minuteOfDay)
+    const sleep1End = 360 // 06:00 AM
+    const sleep2Start = Math.max(1320, minuteOfDay) // 22:00 PM
+    const sleep2End = 1440 // Midnight
+
+    const cleanedBlocks: ScheduleBlock[] = []
+
+    for (const block of blocks) {
+      let blockStart = block.startMinute
+      let blockEnd = block.startMinute + block.durationMinutes
+
+      // Trim Sleep 1 window
+      if (sleep1Start < sleep1End && blockStart < sleep1End && blockEnd > sleep1Start) {
+        blockStart = Math.max(blockStart, sleep1End)
+      }
+
+      // Trim Sleep 2 window
+      if (sleep2Start < sleep2End && blockStart < sleep2End && blockEnd > sleep2Start) {
+        blockEnd = Math.min(blockEnd, sleep2Start)
+      }
+
+      const duration = blockEnd - blockStart
+      if (duration >= 5) {
+        cleanedBlocks.push({
+          ...block,
+          startMinute: blockStart,
+          durationMinutes: duration,
+        })
+      }
+    }
+
+    // Now inject the sleep blocks
+    if (sleep1Start < sleep1End) {
+      cleanedBlocks.push({
+        id: `repaired_sleep_morning_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        startMinute: sleep1Start,
+        durationMinutes: sleep1End - sleep1Start,
+        action: 'sleep',
+        target: targetHomeName,
+        reasoning: 'Prioritizing rest during night hours',
+        dialogue: '',
+        emotionalState: 'tired',
+      })
+    }
+
+    if (sleep2Start < sleep2End) {
+      cleanedBlocks.push({
+        id: `repaired_sleep_night_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        startMinute: sleep2Start,
+        durationMinutes: sleep2End - sleep2Start,
+        action: 'sleep',
+        target: targetHomeName,
+        reasoning: 'Prioritizing rest during night hours',
+        dialogue: '',
+        emotionalState: 'tired',
+      })
+    }
+
+    return cleanedBlocks.sort((a, b) => a.startMinute - b.startMinute)
   }
 }

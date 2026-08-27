@@ -1121,7 +1121,7 @@ CONVERSATION TOPICS: Let topics emerge from the latest line and shared context: 
     return `You are ${agentName}, planning one day in a small medieval village.
 Return ONLY valid JSON in this form: {"blocks":[...]}. Each block must contain:
 {"startMinute": 360, "durationMinutes": 60, "action": "move|talk|work|investigate|interrogate|call_inquisitor|rest|sleep|attack|steal|destroy|help|flee|gather|eat|cry|idle|pray|conjure|summon|resurrect|heal|bless|curse|ritual|preach|invite_cult|build_shrine", "target": "exact person/building name or null", "reasoning": "brief reason", "dialogue": "spoken words or empty string", "emotionalState": "happy|neutral|sad|angry|afraid|excited|tired|hungry|panicked|grieving|ambivalent|determined"}.
-startMinute is the minute after midnight (0-1439). Make a chronological, non-overlapping schedule covering the remainder of the day. Prefer meaningful blocks of 30-240 minutes so the simulation does not need constant decisions. Use only targets listed in the prompt.`
+startMinute is the minute after midnight (0-1439). Make a chronological, non-overlapping schedule covering the remainder of the day. Prefer meaningful blocks of 30-240 minutes so the simulation does not need constant decisions. Use only targets listed in the prompt. If your planning covers the night (20:00 to 06:00), you MUST schedule a continuous sleep block of at least 5-6 hours (300-360 minutes) at your home building.`
   }
 
   private parseResponse(content: string): AgentAction {
