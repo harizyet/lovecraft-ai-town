@@ -1,5 +1,5 @@
 import { Agent } from '@/agent/Agent'
-import { ActionType, ForbiddenRelic, Rumour, ForbiddenKnowledgeEntry } from '@/types'
+import { ActionType, Building, CultScheme, ForbiddenRelic, Rumour, ForbiddenKnowledgeEntry } from '@/types'
 import { SystemDeps } from './SystemDeps'
 import { ExistentialReactionResult } from '@/ai/AIProvider'
 
@@ -247,5 +247,75 @@ export class RelicSystem {
     }
 
     this.deps.story.queueStoryMoment('deity_relic_created', relic.title, description, 'world', event.id)
+  }
+
+  // Cult Scheme (relic_exposure primitive): the leader plants a relic near
+  // their own job-appropriate building. Unlike the two creation methods
+  // above, this one is deterministic given its inputs -- severity and
+  // containsForbiddenKnowledge are already resolved by the caller
+  // (CultSystem.executeCultScheme, from the leader's own state), not rolled
+  // here. Discovery, sanity reactions, and conversion rolls all still flow
+  // through the same handleDiscovery()/advanceRelics() pipeline once this
+  // relic is in world.relics -- no changes needed there.
+  public createSchemeRelic(
+    leader: Agent,
+    scheme: CultScheme,
+    building: Building,
+    severity: number,
+    containsForbiddenKnowledge: boolean
+  ): ForbiddenRelic {
+    this.state.relicCounter++
+    const cult = leader.state.cult
+    const deityName = cult ? this.deps.chooseDeityName(leader) : undefined
+    const relic: ForbiddenRelic = {
+      id: `relic_${Math.floor(this.deps.getAbsoluteMinute())}_${this.state.relicCounter}`,
+      position: {
+        x: Math.round(building.position.x + building.size.x / 2),
+        y: Math.round(building.position.y + building.size.y / 2),
+      },
+      title: `A hidden token near ${building.name}`,
+      // What a discovering agent actually reads -- the validator caps this
+      // to 200 chars precisely because it ends up here.
+      text: scheme.narrative.method,
+      authorAgentId: leader.state.id,
+      authorName: leader.state.name,
+      cultId: scheme.cultId,
+      cultName: cult?.name,
+      deityName,
+      containsForbiddenKnowledge,
+      severity,
+      createdAtMinute: this.deps.getAbsoluteMinute(),
+      discoveredByAgentIds: [],
+    }
+    this.deps.world.relics.set(relic.id, relic)
+
+    const description = `${leader.state.name} left something behind near ${building.name}, under cover of ${scheme.narrative.coverStory}`
+    const event = this.deps.eventBus.emit({
+      type: 'relic_created',
+      agentId: leader.state.id,
+      actionType: ActionType.CORRUPT,
+      outcome: containsForbiddenKnowledge ? 'forbidden_relic_created' : 'relic_created',
+      description,
+      causationIds: [],
+      worldStateDelta: {
+        relicId: relic.id,
+        schemeId: scheme.id,
+        x: relic.position.x,
+        y: relic.position.y,
+        containsForbiddenKnowledge,
+      },
+      observers: [leader.state.id],
+    })
+    leader.addRecentMemory(event)
+
+    // Deliberately no applyExistentialWitnessReaction call here (unlike
+    // maybeCreateRelicFromInvestigation, which applies it to a non-cultist
+    // investigator) -- handleDiscovery's own isCultist shield already
+    // exempts cult leaders from this exact reaction when they discover a
+    // relic, so applying it to the leader at creation time would be
+    // inconsistent. No queueStoryMoment call either -- executeCultScheme
+    // owns that, since it needs to combine this relic with the scheme's own
+    // narrative, which this method has no visibility into.
+    return relic
   }
 }

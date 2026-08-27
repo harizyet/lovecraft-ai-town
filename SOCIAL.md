@@ -767,6 +767,27 @@ Forbidden Relics can be generated in two ways:
   - **Organic Relics with Forbidden Knowledge**: The agent undergoes a standard existential-witness reaction check.
   - **Cult Alignment**: If the relic is cult-tagged, the agent has a personality-weighted chance (scaled by curiosity and caution) to willingly join the associated cult. Specifically, the base chance is 35% if the relic is forbidden (20% if not), boosted by `curiosity * 0.25` and penalized by `caution * 0.2`. If they pass, they trigger `maybeTriggerWillingCultJoin` toward the deity.
 
+## Cult schemes: covert, job-flavored conversion
+
+Beyond ordinary preaching, invitation, and bribery, a cult leader (or founder) has one additional, quieter recruitment channel: once per simulated day, they may devise a covert **scheme** that uses their own public trade as cover — a farmer's tainted grain, a carpenter's idol worked into an ordinary carving, a merchant's marked trinket, a priest's consecrated relic — without any of it visibly reading as cult activity to onlookers.
+
+An LLM is asked to invent the scheme's flavor, but it is deliberately given only two choices with any mechanical weight: which kind of tactic to use, and how bold a posture to take. Everything about how *powerful* the scheme actually is comes from the leader's own standing in the village — their ambition, their faith, the size of their cult, and their reputation — not from anything the LLM decides. A leader with little real influence who asks for something bold gets no more out of it than their circumstances actually support; a well-established, ambitious leader playing it "subtle" is deliberately holding back rather than being mechanically weak.
+
+### The two tactics
+
+- **A planted object** (idol, charm, marked trinket, tainted batch, consecrated token) — placed near a building of the leader's own trade, where an unsuspecting villager may later stumble on it. This becomes an ordinary Forbidden Relic (see above), so it is discovered, read, and reacted to through the exact same proximity mechanic as any relic left behind by an investigator's own writing — no separate discovery system exists for it. Depending on how potent the leader's own standing makes the scheme, the object may carry nothing more than a quiet pull toward the cult, or it may cross into genuine forbidden knowledge with the same sanity risk a written relic poses. A merchant's trinket can never carry that risk regardless of potency — some vocations simply aren't plausible carriers of real lore, however bold the merchant is willing to be.
+- **Quiet influence** — using ordinary daily contact near the leader's own workplace (customers at a stall, patients at the apothecary, a congregation at the pulpit) to nudge nearby villagers a little further toward the cult, with nothing physical left behind. This uses the same underlying conversion-progress mechanic as ordinary preaching, just scaled by the scheme's computed potency rather than a flat rate.
+
+Every vocation affords quiet influence. A planted object is only available to trades with a plausible physical craft or private access — farmer, carpenter, merchant, blacksmith, healer, steward, innkeeper, and priest — each tuned to how severe and lore-bearing an object that trade could credibly produce (a blessed relic from a priest can carry real forbidden knowledge; a peddled trinket from a merchant never can). The Town Guard has no natural object to plant, but their authority gives them unusually strong quiet-influence leverage instead — villagers cannot as easily decline a guard's attention the way they could a stranger's.
+
+### Guardrails
+
+An LLM's proposed scheme is checked against what the leader's actual trade affords before anything happens: a proposal asking for a tactic the leader's vocation doesn't support is rejected outright, not weakened or reinterpreted. A rejection prompts one retry with the specific reason folded back into the request; if that also fails, a small, deliberately unremarkable fallback scheme for that trade is used instead, so a struggling local model never blocks a leader's turn entirely. Nothing about the fallback path is mechanically weaker than an LLM-authored scheme — only its flavor text is blander.
+
+### Discovery
+
+A scheme that plants a relic gets caught the same way any relic does: a villager who wanders close enough reads it, and depending on what it actually contains, that can end in nothing more than a quiet nudge toward the cult, or in the same sanity risk (and eventual investigation trail) that any other forbidden writing poses. Nothing about a scheme-planted relic is hidden from the systems that already watch for this — investigators, priests, and the Sheriff treat it exactly like an ordinary relic once it's found.
+
 ## Village endings
 
 Two long-run outcomes are checked every tick against the current set of living villagers, each narrated only once per game:

@@ -1,4 +1,5 @@
 import { AgentAction, CourtVote, ExistentialReaction, ForbiddenKnowledgeCategory, PolicyVote, ScheduleBlock } from '@/types'
+import { RawSchemeProposal } from '@/agent/systems/SchemeValidator'
 
 export interface LLMQueryStats {
   made: number
@@ -54,6 +55,7 @@ export interface AIProvider {
   classifyForbiddenKnowledge(text: string): Promise<ForbiddenKnowledgeClassification>
   interpretExistentialReaction(agentName: string, prompt: string): Promise<ExistentialReactionResult>
   generateCultName(claimText: string, revelationText: string): Promise<string>
+  generateCultScheme(agentName: string, job: string, prompt: string): Promise<RawSchemeProposal>
   narrateKeyMoment(prompt: string): Promise<string>
   getLastTransaction(agentName: string): { query: string; response: string } | undefined
   isAvailable(): boolean
@@ -534,6 +536,51 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     if (!name) throw new Error('[AI] Generated cult name is empty')
     this.queryStats.successful++
     return name
+  }
+
+  // Note this deliberately does NOT call SchemeValidator itself -- this
+  // stays a pure transport/parsing layer, same as generateCultName above;
+  // CultSystem.maybeProposeCultScheme is the sole caller of the validator.
+  // Only throws if `primitive` is entirely missing: an invalid-but-present
+  // primitive should reach the validator for a proper rejection reason
+  // rather than being swallowed here as a generic network-style failure.
+  public async generateCultScheme(agentName: string, job: string, prompt: string): Promise<RawSchemeProposal> {
+    if (!this.available) throw new Error('LLM not available')
+    this.queryStats.made++
+    const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.config.model,
+        messages: [
+          {
+            role: 'system',
+            content: `You design a covert cult-recruitment scheme for a village cult leader whose day job is their cover. Return ONLY valid JSON matching exactly: {"primitive": string, "risk": string, "narrative": {"coverStory": string, "method": string, "steps": string[]}}. "primitive" must be exactly one of the mechanical actions the user message lists as allowed -- never invent a new one. "risk" must be exactly one of "subtle", "moderate", or "bold" -- it describes how bold a posture the leader takes, not how powerful the scheme is. Keep narrative fields concise (one to two sentences each, 1-3 steps).`,
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.85,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(this.config.timeout),
+    })
+    if (!response.ok) throw new Error(`LLM error: ${response.status}`)
+    const data = await response.json()
+    const parsed = this.parseJSONObject(String(data.choices?.[0]?.message?.content ?? '{}'))
+    const primitive = String(parsed.primitive ?? '').trim()
+    const risk = String(parsed.risk ?? '').trim()
+    const narrativeRaw = (parsed.narrative ?? {}) as Record<string, unknown>
+    if (!primitive) throw new Error(`[AI] ${agentName}'s (${job}) generated cult scheme is missing a primitive`)
+    this.queryStats.successful++
+    return {
+      primitive,
+      risk,
+      narrative: {
+        coverStory: String(narrativeRaw.coverStory ?? '').trim(),
+        method: String(narrativeRaw.method ?? '').trim(),
+        steps: Array.isArray(narrativeRaw.steps) ? narrativeRaw.steps.map((s) => String(s)) : [],
+      },
+    }
   }
 
   public async narrateKeyMoment(prompt: string): Promise<string> {

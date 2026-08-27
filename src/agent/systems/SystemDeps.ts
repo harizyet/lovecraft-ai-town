@@ -15,8 +15,10 @@ import {
   CourtVote,
   CultAgenda,
   CultRequest,
+  CultScheme,
   DailySchedule,
   DecisionTrigger,
+  ForbiddenRelic,
   LLMRequestStatus,
   Rumour,
   RumourProvenance,
@@ -221,6 +223,16 @@ export interface SystemDeps {
   // Relic subsystem (RelicSystem.ts) -- called once a rumour investigation
   // has finished, to give it a chance of leaving a Forbidden Relic behind.
   maybeCreateForbiddenRelic(agent: Agent, rumour: Rumour, causationId: string): void
+  // Cult Scheme (relic_exposure primitive) -- plants a relic near the
+  // leader's own job-appropriate building, severity/forbidden-flag already
+  // resolved by the caller.
+  createSchemeRelic(
+    leader: Agent,
+    scheme: CultScheme,
+    building: Building,
+    severity: number,
+    containsForbiddenKnowledge: boolean
+  ): ForbiddenRelic
 
   // Shared by JusticeSystem and PoliticalSystem verdicts/outcomes.
   banishAgent(agent: Agent, reason: string, policySessionId: string): void

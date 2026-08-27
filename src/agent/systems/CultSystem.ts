@@ -1,4 +1,4 @@
-import { Agent } from '@/agent/Agent'
+import { Agent, JOB_AFFORDANCES } from '@/agent/Agent'
 import {
   ActionType,
   AgentAction,
@@ -7,16 +7,21 @@ import {
   CourtVote,
   CultAgenda,
   CultRequest,
+  CultScheme,
+  CultSchemeRisk,
   EmotionalState,
+  Job,
   RelationshipType,
   Rumour,
   ScheduleBlock,
   SimulationEvent,
   WeatherCondition,
+  isJob,
 } from '@/types'
 import { isCultRelatedRumour } from '@/utils/RumourRules'
 import { PropheticTask } from '@/ai/AIProvider'
 import { SystemDeps } from './SystemDeps'
+import { RawSchemeProposal, validateSchemeProposal } from './SchemeValidator'
 
 // Duplicated from AgentManager's module-level ACTION_MAP (kept private there)
 // rather than imported, to avoid a circular import between AgentManager.ts
@@ -58,6 +63,10 @@ export interface CultState {
   cultMobCooldownUntil: Map<string, number>
   cultMobTargets: Map<string, string>
   cultShrineCommandIssued: Set<string>
+  // Cult Scheme daily-proposal gate, keyed by leader agentId -- per-leader
+  // rather than a single scalar (unlike ReligionSystem's Prophet-singleton
+  // lastDailyPropheticClaimDay) since cult leadership isn't unique.
+  lastCultSchemeProposalDay: Record<string, number>
 }
 
 export function createCultState(): CultState {
@@ -66,6 +75,7 @@ export function createCultState(): CultState {
     cultMobCooldownUntil: new Map(),
     cultMobTargets: new Map(),
     cultShrineCommandIssued: new Set(),
+    lastCultSchemeProposalDay: {},
   }
 }
 
@@ -2155,5 +2165,278 @@ export class CultSystem {
       }
     }
     return strongestCandidateConfidence
+  }
+
+  // Cult Scheme (Phase 1): job-flavored covert conversion tactics. The LLM
+  // proposes *what kind* of scheme (primitive) and *how bold a posture*
+  // (risk); the engine alone derives how powerful it actually is from the
+  // leader's own standing (see computeSchemeIntensity) and executes it
+  // through the existing conversion/relic mutators -- no new mechanics.
+
+  private static readonly FALLBACK_SCHEMES: Partial<Record<Job, { primitive: CultScheme['primitive']; risk: CultSchemeRisk; narrative: CultScheme['narrative'] }>> = {
+    Farmer: {
+      primitive: 'relic_exposure',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Sorting the grain for market as usual.',
+        method: 'Hid a carved token deep in a grain sack for the cult to find.',
+        steps: ['Selected a sack bound for a trusted household.'],
+      },
+    },
+    Carpenter: {
+      primitive: 'relic_exposure',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Finishing a commissioned carving.',
+        method: 'Worked a hidden idol into the grain of an ordinary carving.',
+        steps: ['Chose a piece unlikely to be scrutinized closely.'],
+      },
+    },
+    Merchant: {
+      primitive: 'conversion_influence',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Minding the stall as usual.',
+        method: "Steered idle chatter with regular customers toward the cult's teachings.",
+        steps: ['Engaged the most curious-looking regulars.'],
+      },
+    },
+    Blacksmith: {
+      primitive: 'relic_exposure',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Forging ironwork for the day\'s orders.',
+        method: 'Marked a horseshoe with a hidden symbol before handing it over as a "ward".',
+        steps: ['Chose a customer unlikely to look closely at the marking.'],
+      },
+    },
+    'Town Guard': {
+      primitive: 'conversion_influence',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Walking the usual patrol.',
+        method: "Used routine checks on villagers as cover to press the cult's teachings.",
+        steps: ['Lingered longest with the most receptive villagers on the route.'],
+      },
+    },
+    Healer: {
+      primitive: 'relic_exposure',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Treating a patient\'s complaints as usual.',
+        method: 'Slipped a quiet talisman in among the prescribed remedies.',
+        steps: ['Chose a patient already troubled by bad dreams.'],
+      },
+    },
+    Steward: {
+      primitive: 'relic_exposure',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Filing the manor\'s routine paperwork.',
+        method: 'Worked a hidden symbol into the margin of an ordinary ledger entry.',
+        steps: ['Filed it among records unlikely to be re-read soon.'],
+      },
+    },
+    Innkeeper: {
+      primitive: 'relic_exposure',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Turning down the rooms for the night.',
+        method: 'Tucked a small charm under a traveler\'s pillow as a "lucky token".',
+        steps: ['Chose a room belonging to a guest staying several nights.'],
+      },
+    },
+    Priest: {
+      primitive: 'relic_exposure',
+      risk: 'moderate',
+      narrative: {
+        coverStory: 'Preparing the altar for the next service.',
+        method: 'Consecrated an ordinary relic with a rite the congregation would never recognize.',
+        steps: ['Set it where the most devout would find it first.'],
+      },
+    },
+  }
+
+  private logSchemeValidationFailure(agent: Agent, job: Job, primitive: string, reason: string, attempt: number): void {
+    this.deps.eventBus.emit({
+      type: 'cult_scheme_validation_failed',
+      agentId: agent.state.id,
+      actionType: ActionType.CORRUPT,
+      outcome: 'rejected',
+      description: `${agent.state.name}'s proposed cult scheme was rejected: ${reason}`,
+      causationIds: [],
+      worldStateDelta: { leader: agent.state.name, job, primitive, reason, attempt },
+      observers: [agent.state.id],
+    })
+  }
+
+  public maybeProposeCultScheme(): void {
+    if (!this.deps.aiProvider?.isAvailable() || this.deps.isLLMRequestInFlight() || this.deps.story.hasPendingNarrations()) return
+
+    for (const agent of this.deps.getAgents()) {
+      if (!agent.state.alive) continue
+      const role = agent.state.cult?.role
+      if (role !== 'leader' && role !== 'founder') continue
+      if (agent.state.activeCultScheme) continue
+      if ((this.state.lastCultSchemeProposalDay[agent.state.id] ?? -1) >= this.deps.getCurrentDay()) continue
+
+      const rawJob = agent.state.prophetFormerJob ?? agent.state.currentJob
+      if (!isJob(rawJob)) continue
+      const job: Job = rawJob
+      const affordance = JOB_AFFORDANCES[job]
+      const cult = agent.state.cult!
+      const proposalDay = this.deps.getCurrentDay()
+
+      const promise = (async () => {
+        let source: CultScheme['proposalSource'] = 'llm'
+        let validated: { primitive: CultScheme['primitive']; risk: CultSchemeRisk; narrative: CultScheme['narrative'] } | undefined
+        let retryReason: string | undefined
+
+        for (let attempt = 1; attempt <= 2 && !validated; attempt++) {
+          let raw: RawSchemeProposal | undefined
+          try {
+            raw = await this.deps.runLLMRequestWithRetry(
+              agent.state.id,
+              `${agent.state.name} cult scheme`,
+              () => this.deps.aiProvider!.generateCultScheme(
+                agent.state.name,
+                job,
+                this.deps.promptBuilder.buildCultSchemePrompt(agent, this.deps.getAgents(), job, affordance, cult, retryReason)
+              ),
+              2
+            )
+          } catch (error) {
+            if (this.deps.isAgentRefreshCancellation(error)) return
+            this.logSchemeValidationFailure(agent, job, '(request failed)', 'llm request failed', attempt)
+            continue
+          }
+          const result = validateSchemeProposal(raw, job)
+          if (result.ok && result.scheme) {
+            validated = result.scheme
+            source = attempt === 1 ? 'llm' : 'llm_retry'
+          } else {
+            retryReason = result.reason ?? 'unknown'
+            this.logSchemeValidationFailure(agent, job, raw.primitive, retryReason, attempt)
+          }
+        }
+
+        if (!validated) {
+          const fallback = CultSystem.FALLBACK_SCHEMES[job]
+          if (!fallback) {
+            this.state.lastCultSchemeProposalDay[agent.state.id] = proposalDay
+            return
+          }
+          validated = fallback
+          source = 'fallback'
+        }
+
+        if (!agent.state.alive || this.deps.getCurrentDay() !== proposalDay) return
+
+        const scheme: CultScheme = {
+          id: `scheme_${Math.floor(this.deps.getAbsoluteMinute())}_${agent.state.id}`,
+          cultId: cult.id,
+          leaderAgentId: agent.state.id,
+          job,
+          primitive: validated.primitive,
+          risk: validated.risk,
+          narrative: validated.narrative,
+          targetBuildingType: validated.primitive === 'relic_exposure' ? affordance.buildingTypes[0] : undefined,
+          targetRadius: validated.primitive === 'conversion_influence' ? CultSystem.PREACH_LISTEN_RADIUS : undefined,
+          status: 'proposed',
+          proposedAtMinute: this.deps.getAbsoluteMinute(),
+          proposalSource: source,
+        }
+        agent.state.activeCultScheme = scheme
+        this.state.lastCultSchemeProposalDay[agent.state.id] = proposalDay
+
+        this.deps.eventBus.emit({
+          type: 'cult_scheme_proposed',
+          agentId: agent.state.id,
+          actionType: ActionType.CORRUPT,
+          outcome: 'proposed',
+          description: `${agent.state.name} quietly devised a scheme: ${scheme.narrative.coverStory}`,
+          causationIds: [],
+          worldStateDelta: { schemeId: scheme.id, primitive: scheme.primitive, risk: scheme.risk, proposalSource: source },
+          observers: [agent.state.id],
+        })
+      })()
+
+      this.deps.setLLMRequestInFlight(true)
+      this.deps.pendingActivityLabels.set(agent.state.id, 'plotting a covert scheme')
+      this.deps.pendingDecisions.set(agent.state.id, promise)
+      promise.finally(() => {
+        this.deps.pendingDecisions.delete(agent.state.id)
+        this.deps.pendingActivityLabels.delete(agent.state.id)
+        this.deps.setLLMRequestInFlight(false)
+      })
+      return // one proposal in flight at a time, same as ensureDailyPropheticClaim
+    }
+  }
+
+  public advanceCultSchemes(): void {
+    for (const agent of this.deps.getAgents()) {
+      const scheme = agent.state.activeCultScheme
+      if (!scheme || scheme.status !== 'proposed') continue
+      scheme.status = 'active'
+      this.executeCultScheme(agent, scheme)
+    }
+  }
+
+  private computeSchemeIntensity(leader: Agent, scheme: CultScheme): number {
+    const affordance = JOB_AFFORDANCES[scheme.job]
+    const cultSize = this.deps.getAgents().filter((a) => a.state.cult?.id === scheme.cultId).length
+    const raw =
+      affordance.baseJobPower +
+      leader.state.personality.ambition * 20 +
+      Math.min(cultSize, 10) * 3 +
+      leader.state.beliefSystem.faith * 0.2 +
+      leader.state.reputation * 0.1
+    const riskCap: Record<CultSchemeRisk, number> = { subtle: 30, moderate: 65, bold: 100 }
+    return Math.max(0, Math.min(raw, riskCap[scheme.risk], 100))
+  }
+
+  private executeCultScheme(leader: Agent, scheme: CultScheme): void {
+    const intensity = this.computeSchemeIntensity(leader, scheme)
+    scheme.computedIntensity = intensity
+    const resultEventId = `scheme_result_${scheme.id}`
+    let kind: 'cult_scheme_relic_planted' | 'cult_scheme_influence_spread'
+    let facts: string
+
+    if (scheme.primitive === 'relic_exposure') {
+      const affordance = JOB_AFFORDANCES[scheme.job]
+      const severity = affordance.allowsForbiddenKnowledge ? Math.round((intensity / 100) * affordance.maxRelicSeverity) : 0
+      const containsForbiddenKnowledge = affordance.allowsForbiddenKnowledge && severity >= 40
+      const building = this.deps.findBuildingOfType(leader, scheme.targetBuildingType!)
+      if (!building) {
+        scheme.status = 'rejected'
+        this.finishScheme(leader, scheme)
+        return
+      }
+      const relic = this.deps.createSchemeRelic(leader, scheme, building, severity, containsForbiddenKnowledge)
+      kind = 'cult_scheme_relic_planted'
+      facts = `${leader.state.name}, a ${scheme.job}, used the cover story "${scheme.narrative.coverStory}" to ${scheme.narrative.method} They hid it near ${building.name} ("${relic.title}").`
+    } else {
+      const building = this.deps.findBuildingOfType(leader, scheme.targetBuildingType ?? '')
+      const center = building?.position ?? leader.state.position
+      const listeners = this.deps.getAgents().filter((a) =>
+        a.state.alive && a.state.id !== leader.state.id &&
+        Math.hypot(a.state.position.x - center.x, a.state.position.y - center.y) <= (scheme.targetRadius ?? CultSystem.PREACH_LISTEN_RADIUS)
+      )
+      const influenceScale = 0.5 + (intensity / 100) * 1.5
+      this.advanceCultConversionProgress(leader, listeners, leader.state.cult!, resultEventId, influenceScale, 'preaching')
+      kind = 'cult_scheme_influence_spread'
+      facts = `${leader.state.name}, a ${scheme.job}, used the cover story "${scheme.narrative.coverStory}" to ${scheme.narrative.method} It reached ${listeners.length} villager(s) nearby.`
+    }
+
+    scheme.status = 'resolved'
+    scheme.resolvedAtMinute = this.deps.getAbsoluteMinute()
+    scheme.resultEventId = resultEventId
+    this.deps.story.queueStoryMoment(kind, scheme.narrative.coverStory, facts, leader.state.id, resultEventId)
+    this.finishScheme(leader, scheme)
+  }
+
+  private finishScheme(leader: Agent, scheme: CultScheme): void {
+    leader.state.cultSchemeHistory = [...(leader.state.cultSchemeHistory ?? []), scheme].slice(-5)
+    leader.state.activeCultScheme = undefined
   }
 }

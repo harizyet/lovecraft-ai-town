@@ -119,6 +119,81 @@ export interface ForbiddenRelic {
   discoveredByAgentIds: string[]
 }
 
+// The finite set of villager vocations. Canonical here (rather than in
+// Agent.ts, which imports from this file) so CultScheme can reference it
+// without a circular import; Agent.ts's JOBS array is the runtime list and
+// is typed against this union.
+export type Job =
+  | 'Blacksmith'
+  | 'Carpenter'
+  | 'Merchant'
+  | 'Town Guard'
+  | 'Healer'
+  | 'Steward'
+  | 'Innkeeper'
+  | 'Farmer'
+  | 'Priest'
+
+export const ALL_JOBS: readonly Job[] = [
+  'Blacksmith',
+  'Carpenter',
+  'Merchant',
+  'Town Guard',
+  'Healer',
+  'Steward',
+  'Innkeeper',
+  'Farmer',
+  'Priest',
+]
+
+export function isJob(value: string | undefined): value is Job {
+  return value != null && (ALL_JOBS as readonly string[]).includes(value)
+}
+
+// A cult leader's covert scheme: the LLM proposes what kind of tactic to use
+// (primitive) and how bold a posture to take (risk); the engine alone derives
+// how powerful it actually is (see CultSystem.computeSchemeIntensity) from
+// the leader's own standing -- ambition, faith, cult size, reputation, and
+// what their vocation affords (JOB_AFFORDANCES). The LLM never sets potency
+// directly.
+export type CultSchemePrimitive = 'relic_exposure' | 'conversion_influence'
+export type CultSchemeStatus = 'proposed' | 'active' | 'resolved' | 'rejected'
+export type CultSchemeRisk = 'subtle' | 'moderate' | 'bold'
+
+export const CULT_SCHEME_PRIMITIVES: CultSchemePrimitive[] = ['relic_exposure', 'conversion_influence']
+export const CULT_SCHEME_RISKS: CultSchemeRisk[] = ['subtle', 'moderate', 'bold']
+
+export interface CultScheme {
+  id: string
+  cultId: string
+  leaderAgentId: string
+  // Resolved once as prophetFormerJob ?? currentJob when the scheme is
+  // proposed, and never re-derived afterward, so the scheme stays flavored
+  // to the job the leader had at proposal time even if their cover changes.
+  job: Job
+  primitive: CultSchemePrimitive
+  risk: CultSchemeRisk
+  // Flavor only -- never interpreted mechanically. Feeds the StorySystem
+  // facts string and (for relic_exposure) the relic's own title/text.
+  narrative: {
+    coverStory: string
+    method: string
+    steps: string[]
+  }
+  targetBuildingType?: string
+  targetRadius?: number
+  status: CultSchemeStatus
+  proposedAtMinute: number
+  resolvedAtMinute?: number
+  resultEventId?: string
+  // Set by CultSystem.executeCultScheme at resolution -- kept purely for
+  // history/debugging, never read back into a decision.
+  computedIntensity?: number
+  // Provenance -- lets dev/tuning tell whether the local model is actually
+  // producing valid job-specific schemes or silently falling back.
+  proposalSource: 'llm' | 'llm_retry' | 'fallback'
+}
+
 export enum ActionType {
   MOVE = 'move',
   TALK = 'talk',
@@ -487,7 +562,7 @@ export interface Rumour {
   timelineSummary?: string
 }
 
-export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'cult_leader_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight' | 'forbidden_relic_created' | 'deity_relic_created' | 'alderman_named' | 'knight_called' | 'inquisitor_called' | 'knight_killed' | 'inquisitor_killed' | 'only_cultists_survive' | 'cult_leader_sole_survivor' | 'cults_extinguished'
+export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'cult_leader_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight' | 'forbidden_relic_created' | 'deity_relic_created' | 'alderman_named' | 'knight_called' | 'inquisitor_called' | 'knight_killed' | 'inquisitor_killed' | 'only_cultists_survive' | 'cult_leader_sole_survivor' | 'cults_extinguished' | 'cult_scheme_relic_planted' | 'cult_scheme_influence_spread'
 
 export interface StoryMoment {
   id: string
@@ -642,6 +717,13 @@ export interface AgentState {
   // identity instead of staying publicly labelled "Prophet".
   prophetFormerJob?: string
   cultConversionProgress?: Record<string, number>
+  // A cult leader's currently in-flight covert scheme, if any -- see
+  // CultScheme. Only ever set on agents with a cult leader/founder role.
+  activeCultScheme?: CultScheme
+  // Rolling history of this leader's past schemes (resolved or rejected),
+  // most recent last, capped at 5. Used for narration/anti-repeat context
+  // only, never re-read mechanically.
+  cultSchemeHistory?: CultScheme[]
   blessing?: {
     sourceAgentId: string
     sourceCultId?: string

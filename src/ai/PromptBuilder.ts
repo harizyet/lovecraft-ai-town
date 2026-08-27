@@ -1,5 +1,5 @@
-import { Agent } from '@/agent/Agent'
-import { AgentState, DailySchedule, DecisionTrigger, SimulationEvent, RelationshipType, StoryMomentKind } from '@/types'
+import { Agent, JobSchemeAffordance } from '@/agent/Agent'
+import { AgentState, DailySchedule, DecisionTrigger, SimulationEvent, RelationshipType, StoryMomentKind, Job } from '@/types'
 
 interface LastActionInfo {
   action: string
@@ -29,6 +29,8 @@ const KEY_MOMENT_LABELS: Record<StoryMomentKind, string> = {
   only_cultists_survive: "the village's last ordinary, unconverted souls all gone -- to death, exile, or worse -- leaving only the cult's own faithful still breathing within its bounds; write this as the moment the village and the cult become, quietly and irreversibly, the same thing, with no unconverted witness left to mourn what the place used to be",
   cult_leader_sole_survivor: "the final reckoning of that same slow conquest -- every other soul in the village now gone, and only the cult's leader left standing alone amid it, sole survivor and sole believer of a faith that has, in the end, no one left to preach to; write this as the eerie, hollow triumph of a prophet who has finally won everything and is left with no one",
   cults_extinguished: "the opposite turn of fortune -- every cult that ever rose in this village, and every leader who ever led one, now gone, whether to the noose, the blade, exile, or plain abandonment, leaving no altar still tended and no congregation still whispering in secret; write this as the village's quiet exhale after a long-running darkness finally guttering out, with room for both relief and the faint, uneasy sense that something is now missing",
+  cult_scheme_relic_planted: "a cult leader using their own ordinary trade as cover to plant a hidden object -- an idol, a tainted batch, a marked token -- for some unsuspecting villager to later stumble on; write this as the quiet, workmanlike banality of the act itself (a farmer sacking grain, a carpenter finishing a carving) concealing exactly what has actually been hidden inside it, the horror sitting in the ordinariness of the labor rather than in any overt ritual",
+  cult_scheme_influence_spread: "a cult leader working their cult's growth through nothing more dramatic than their own daily trade -- conversations struck up over a counter, a workbench, a field -- nudging the villagers who cross their path a little further toward belief without any of them quite noticing it as recruitment; write this as ordinary commerce or labor doubling as ministry, the leader's real work happening beneath the cover of their visible one",
 }
 
 export class PromptBuilder {
@@ -52,6 +54,33 @@ ${agent.getObservations(allAgents)}
 ${state.memory.summary ? `Long-term memory: ${state.memory.summary}\n` : ''}${state.memory.recent.length ? `Recent memory:\n${this.formatMemory(state.memory.recent.slice(-10))}` : ''}
 
 The claim should be concrete enough for villagers to discuss or investigate. Do not repeat an earlier claim and do not call it proven.`
+  }
+
+  public buildCultSchemePrompt(
+    agent: Agent,
+    allAgents: Agent[],
+    job: Job,
+    affordance: JobSchemeAffordance,
+    cult: { id: string; name: string },
+    retryReason?: string
+  ): string {
+    const state = agent.state
+    const relicLine = affordance.allowedPrimitives.includes('relic_exposure')
+      ? `- relic_exposure: hide a physical object (an idol, a tainted batch, a marked trinket) near your ${affordance.buildingTypes[0]} for someone to later find.\n`
+      : ''
+    const history = state.cultSchemeHistory?.length
+      ? `Do not repeat a scheme you already ran: ${state.cultSchemeHistory.map((s) => s.narrative.method).join('; ')}.\n`
+      : ''
+    return `You are ${state.name}, a ${job} in this village, and secretly the leader of the cult "${cult.name}". Propose ONE covert scheme that uses your ordinary trade as cover to advance the cult, exactly as a ${job} plausibly could and no more.
+
+You may choose only from these mechanical actions: ${affordance.allowedPrimitives.join(', ')}.
+${relicLine}- conversion_influence: use your ordinary daily contact with villagers near your trade to quietly sway them toward the cult, with no physical object left behind.
+
+Ground it in what you know: ${agent.getObservations(allAgents)}
+${history}${retryReason ? `Your previous proposal was rejected (${retryReason}) -- choose only from the allowed actions above.\n` : ''}
+Also choose how bold a posture to take: subtle (cautious, low profile), moderate, or bold (visible, higher stakes) -- the actual strength of the scheme's effect depends on your own standing in the village, not on this choice alone.
+
+Return ONLY valid JSON: {"primitive": ${affordance.allowedPrimitives.map((p) => `"${p}"`).join(' | ')}, "risk": "subtle" | "moderate" | "bold", "narrative": {"coverStory": "...", "method": "...", "steps": ["...", "..."]}}.`
   }
 
   public buildPropheticInterpretationPrompt(

@@ -204,6 +204,8 @@ export class AgentManager {
       },
       maybeCreateForbiddenRelic: (agent, rumour, causationId) =>
         this.relicSystem.maybeCreateRelicFromInvestigation(agent, rumour, causationId),
+      createSchemeRelic: (leader, scheme, building, severity, containsForbiddenKnowledge) =>
+        this.relicSystem.createSchemeRelic(leader, scheme, building, severity, containsForbiddenKnowledge),
 
       banishAgent: (agent, reason, policySessionId) => this.banishAgent(agent, reason, policySessionId),
 
@@ -598,6 +600,8 @@ export class AgentManager {
     this.religionSystem.advanceReligiousFervour()
     this.cultSystem.maybeFormCultMobs()
     this.cultSystem.advanceCultMobs()
+    this.cultSystem.maybeProposeCultScheme()
+    this.cultSystem.advanceCultSchemes()
 
     this.rumourSystem.advanceRumourInvestigations()
     this.socialSystem.detectAgentEncounters()

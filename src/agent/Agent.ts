@@ -13,6 +13,9 @@ import {
   ConversationExchange,
   AgentBeliefSystem,
   PoliticalCampId,
+  Job,
+  ALL_JOBS,
+  CultSchemePrimitive,
 } from '@/types'
 import { World } from '@/world/World'
 import { SimulationManager } from '@/simulation/SimulationManager'
@@ -149,19 +152,9 @@ const LAST_NAMES = [
   'Greenwood',
 ]
 
-const JOBS = [
-  'Blacksmith',
-  'Carpenter',
-  'Merchant',
-  'Town Guard',
-  'Healer',
-  'Steward',
-  'Innkeeper',
-  'Farmer',
-  'Priest',
-]
+export const JOBS: readonly Job[] = ALL_JOBS
 
-const JOB_BUILDINGS: Record<string, string[]> = {
+export const JOB_BUILDINGS: Record<Job, string[]> = {
   Blacksmith: ['smithy'],
   Carpenter: ['carpenter_workshop'],
   Merchant: ['market'],
@@ -176,6 +169,49 @@ const JOB_BUILDINGS: Record<string, string[]> = {
 const WEALTHY_JOBS = new Set(['Merchant', 'Steward', 'Innkeeper'])
 const MODEST_JOBS = new Set(['Farmer', 'Carpenter'])
 
+// Cult Scheme affordances (Phase 1): what a leader's vocation lets them
+// covertly do for their cult, and the engine-controlled ceilings on how
+// powerful that can be. The LLM only ever picks primitive + risk (see
+// CultSystem.maybeProposeCultScheme / PromptBuilder.buildCultSchemePrompt);
+// everything here is read exclusively by the engine.
+export interface JobSchemeAffordance {
+  buildingTypes: string[]
+  allowedPrimitives: CultSchemePrimitive[]
+  // 0-30: how much raw mechanical leverage this vocation grants, fed into
+  // CultSystem.computeSchemeIntensity.
+  baseJobPower: number
+  // Outer ceiling on a relic_exposure scheme's severity; 0 means the
+  // primitive is unavailable regardless of allowedPrimitives.
+  maxRelicSeverity: number
+  // Whether this job's relic can carry actual sanity-risk forbidden lore,
+  // independent of severity -- a merchant's trinket never can.
+  allowsForbiddenKnowledge: boolean
+}
+
+// Complete Record, not Partial -- every Job has a row, even ones that only
+// allow conversion_influence today, so a JOB_AFFORDANCES[job] lookup is
+// always defined once `job` has been narrowed to `Job`.
+export const JOB_AFFORDANCES: Record<Job, JobSchemeAffordance> = {
+  Farmer: { buildingTypes: ['farm'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 22, maxRelicSeverity: 70, allowsForbiddenKnowledge: true },
+  Carpenter: { buildingTypes: ['carpenter_workshop'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 16, maxRelicSeverity: 55, allowsForbiddenKnowledge: true },
+  Merchant: { buildingTypes: ['market'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 10, maxRelicSeverity: 35, allowsForbiddenKnowledge: false },
+  // Phase 2: the remaining 6 jobs, widened in place per the comment above --
+  // no restructuring needed, the whole pipeline (validator, prompt builder,
+  // execution) already reads this table generically.
+  Blacksmith: { buildingTypes: ['smithy'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 14, maxRelicSeverity: 50, allowsForbiddenKnowledge: true },
+  // No natural covert object for a guard to plant -- conversion_influence
+  // only, but with elevated baseJobPower: villagers can't easily refuse a
+  // guard's attention the way they could a stranger's.
+  'Town Guard': { buildingTypes: ['guardhouse', 'town_square'], allowedPrimitives: ['conversion_influence'], baseJobPower: 16, maxRelicSeverity: 0, allowsForbiddenKnowledge: false },
+  Healer: { buildingTypes: ['apothecary'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 16, maxRelicSeverity: 45, allowsForbiddenKnowledge: true },
+  Steward: { buildingTypes: ['manor'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 15, maxRelicSeverity: 40, allowsForbiddenKnowledge: true },
+  Innkeeper: { buildingTypes: ['tavern'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 12, maxRelicSeverity: 30, allowsForbiddenKnowledge: false },
+  // Highest tier of the six -- religious authority is the most natural fit
+  // for both primitives, echoing the existing priest_corrupted/
+  // church_corrupted story beats.
+  Priest: { buildingTypes: ['church'], allowedPrimitives: ['relic_exposure', 'conversion_influence'], baseJobPower: 20, maxRelicSeverity: 65, allowsForbiddenKnowledge: true },
+}
+
 const POLITICAL_CAMPS: Record<PoliticalCampId, { id: PoliticalCampId; name: string }> = {
   gentry: { id: 'gentry', name: 'The Gentry' },
   commons: { id: 'commons', name: 'The Commons' },
@@ -189,7 +225,7 @@ function randomInt(min: number, max: number): number {
   return Math.floor(randomBetween(min, max + 1))
 }
 
-function pickRandom<T>(arr: T[]): T {
+function pickRandom<T>(arr: readonly T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
