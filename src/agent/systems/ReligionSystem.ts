@@ -315,6 +315,69 @@ export class ReligionSystem {
     return { success: true, message: `${demon.state.name} accepted the command: “${prompt}”` }
   }
 
+  // What actually happened (the mechanical effect) and what a given
+  // witness believes caused it are two different things. A player clicking
+  // "heal Marcus" is settled fact; "Dagon rewarded Marcus for prayer" is one
+  // villager's conclusion among several equally plausible ones. Each
+  // witness draws independently, weighted by their existing faith, deity
+  // confidence, and cult ties, rather than the game telling everyone the
+  // deity's name is the answer.
+  private pickInterventionInterpretation(
+    agent: Agent,
+    deityName: string,
+    ability: string,
+    polarity: 'positive' | 'negative',
+    isDirectWitness: boolean
+  ): 'divine' | 'coincidence' | 'unknown' | 'mundane' | 'propaganda' | 'delayed' {
+    const stance = agent.state.beliefSystem.religiousStance
+    const deityConfidence = agent.state.beliefSystem.deities.find(
+      (d) => d.name.toLowerCase() === deityName.toLowerCase()
+    )?.confidence ?? 0
+    const isMatchingCultist = Boolean(agent.state.cult) && deityConfidence >= 40
+
+    const weights: Record<'divine' | 'coincidence' | 'unknown' | 'mundane' | 'propaganda' | 'delayed', number> = {
+      divine: 1 + (stance === 'believer' ? 2 : 0) + deityConfidence / 40 + (isMatchingCultist ? 3 : 0) + (isDirectWitness ? 1 : 0),
+      coincidence: 1 + (stance === 'atheist' ? 2 : 0) + agent.state.personality.caution,
+      unknown: 1 + (stance === 'undecided' ? 1 : 0),
+      mundane: ['heal', 'resurrect', 'smite'].includes(ability) ? 1 + (stance === 'atheist' || stance === 'nonbeliever' ? 1.5 : 0) : 0,
+      propaganda: 1 + (stance === 'nonbeliever' || stance === 'atheist' ? 1 : 0) + (agent.state.cult ? -1 : 0),
+      delayed: polarity === 'negative' ? 1 : 0,
+    }
+
+    const total = Object.values(weights).reduce((sum, w) => sum + Math.max(0, w), 0)
+    let roll = Math.random() * total
+    for (const key of Object.keys(weights) as Array<keyof typeof weights>) {
+      roll -= Math.max(0, weights[key])
+      if (roll <= 0) return key
+    }
+    return 'unknown'
+  }
+
+  private interpretationClause(
+    kind: 'divine' | 'coincidence' | 'unknown' | 'mundane' | 'propaganda' | 'delayed',
+    deityName: string,
+    firstPerson: boolean
+  ): string {
+    if (firstPerson) {
+      switch (kind) {
+        case 'divine': return `${deityName} did this. I have no doubt.`
+        case 'coincidence': return `It might just be coincidence. I don't know what to believe.`
+        case 'unknown': return `Something happened to me, but I can't say what caused it.`
+        case 'mundane': return `Maybe there's a mundane explanation. There might be nothing divine about it at all.`
+        case 'propaganda': return `Or maybe someone is playing a trick on me.`
+        case 'delayed': return `I don't know what I did to deserve this -- if I did anything at all.`
+      }
+    }
+    switch (kind) {
+      case 'divine': return `Word is already spreading that ${deityName} answered a prayer.`
+      case 'coincidence': return `Most who heard of it shrugged it off as coincidence.`
+      case 'unknown': return `No one can explain how or why it happened.`
+      case 'mundane': return `Skeptics call it a freak occurrence with a mundane explanation, nothing more.`
+      case 'propaganda': return `Some mutter that the cult staged the whole thing.`
+      case 'delayed': return `Some whisper it's a punishment long overdue, though no one agrees for what.`
+    }
+  }
+
   public performGodAbility(
     ability: 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather',
     targetAgentId?: string,
@@ -351,48 +414,49 @@ export class ReligionSystem {
     )
 
     let description: string
+    let factDescription: string
+    let polarity: 'positive' | 'negative' = 'positive'
     if (ability === 'bless' && target) {
       target.state.reputation = Math.min(100, target.state.reputation + 10)
       target.state.beliefSystem.faith = Math.min(100, target.state.beliefSystem.faith + 10)
       target.state.emotionalState = EmotionalState.DETERMINED
       this.deps.applyTimedBlessing(target, 'world')
-      target.state.lastReasoning = `${deityName} blessed me. I feel favored and resolved.`
       description = `${deityName} answered the invocation by blessing ${target.state.name}.`
+      factDescription = `${target.state.name} was struck by a sudden, unexplained wave of favor and resolve.`
     } else if (ability === 'heal' && target) {
       target.state.health = target.state.maxHealth
-      target.state.lastReasoning = `${deityName} healed my wounds completely. I am in awe.`
       description = `${deityName} answered the invocation by fully healing ${target.state.name}.`
+      factDescription = `${target.state.name}'s wounds closed and their body felt whole again, all at once.`
     } else if (ability === 'smite' && target) {
       const previousHealth = target.state.health
       const died = target.takeDamage(50, deityName)
       const damage = previousHealth - target.state.health
-      if (damage === 0 && target.state.demon) {
-        target.state.lastReasoning = `${deityName} tried to smite me, but I felt nothing. Their power could not touch me.`
-      } else if (died) {
-        target.state.lastReasoning = `${deityName} struck me down. My last thought was disbelief.`
-      } else {
-        target.state.lastReasoning = `${deityName} smote me for ${damage} damage. The pain was undeniable proof of their wrath.`
-      }
+      polarity = 'negative'
       description = damage === 0 && target.state.demon
         ? `${deityName} attempted to smite ${target.state.name}, but the Demon was invulnerable because ${deityName} is not a Knight or Inquisitor outsider.`
         : `${deityName} answered the invocation by smiting ${target.state.name} for ${damage} damage${died ? ', killing them' : ''}.`
+      factDescription = damage === 0 && target.state.demon
+        ? `${target.state.name} felt a force strike at them and pass through, untouched.`
+        : `${target.state.name} was struck by a sudden, unexplained force for ${damage} damage${died ? ', killing them' : ''}.`
     } else if (ability === 'resurrect' && target) {
       target.state.alive = true
       target.state.health = Math.max(50, Math.round(target.state.maxHealth / 2))
       target.state.emotionalState = EmotionalState.AFRAID
       target.state.path = []
       target.state.pathIndex = 0
-      target.state.lastReasoning = `${deityName} brought me back from death. I do not understand how, but I am alive again.`
       this.deps.dailySchedules.delete(target.state.id)
       this.deps.scheduleCursors.delete(target.state.id)
       description = `${deityName} answered the invocation by resurrecting ${target.state.name}.`
+      factDescription = `${target.state.name} drew breath again, with no explanation for how.`
       const insaneCount = this.applyResurrectionInsanity(target, deityName, true)
       if (insaneCount > 0) {
         description += ` The sight of the dead returning to life broke the minds of ${insaneCount} who witnessed it.`
+        factDescription += ` The sight broke the minds of ${insaneCount} who witnessed it.`
       }
     } else if (ability === 'weather' && weatherCondition) {
       const previous = this.deps.simManager.setWeatherByDivineIntervention(weatherCondition)
       description = `${deityName} answered the invocation by changing the weather from ${previous} to ${weatherCondition}.`
+      factDescription = `The weather shifted abruptly from ${previous} to ${weatherCondition}, with no warning.`
     } else if (ability === 'manifest' && target) {
       const wasAlreadyInsane = !!target.state.permanentInsanity
       if (!wasAlreadyInsane) {
@@ -429,8 +493,15 @@ export class ReligionSystem {
         : wasAlreadyInsane
           ? `${deityName} manifested directly before ${target.state.name}, reinforcing their existing permanent insanity.`
           : `${deityName} manifested directly before ${target.state.name}; they retained their sanity and reacted with ${target.state.existentialState?.reaction ?? 'belief'}.`
+      // The target's own interpretation is already handled richly by
+      // applyExistentialWitnessReaction (denial/revelation/obsession/etc.);
+      // only bystanders draw from the generic interpretation pool below.
+      factDescription = becameInsane
+        ? `${target.state.name} witnessed a brief, inexplicable apparition and could not reconcile what they saw.`
+        : `${target.state.name} witnessed a brief, inexplicable apparition.`
     } else {
       description = `${deityName} answered the invocation with a visible manifestation over the village.`
+      factDescription = `A brief, inexplicable manifestation was seen over the village.`
     }
 
     this.state.godInterventionCredits--
@@ -452,7 +523,19 @@ export class ReligionSystem {
       },
       observers: this.deps.getAgents().filter((agent) => agent.state.alive).map((agent) => agent.state.id),
     })
-    for (const agent of this.deps.getAgents().filter((candidate) => candidate.state.alive)) agent.addRecentMemory(event)
+    // Every witness gets the same underlying fact but draws their own
+    // conclusion about its cause; the shared `event` (with the truthful,
+    // deity-attributed `description`) still anchors the global log and the
+    // player-facing story chronicle.
+    for (const agent of this.deps.getAgents().filter((candidate) => candidate.state.alive)) {
+      const isDirectWitness = agent.state.id === target?.state.id
+      const kind = this.pickInterventionInterpretation(agent, deityName, ability, polarity, isDirectWitness)
+      const clause = this.interpretationClause(kind, deityName, isDirectWitness)
+      agent.addRecentMemory({ ...event, description: `${factDescription} ${clause}` })
+      if (isDirectWitness && ability !== 'manifest') {
+        target!.state.lastReasoning = this.interpretationClause(kind, deityName, true)
+      }
+    }
     if (ability === 'weather') {
       // An obsessed villager watching for "tells" that their world isn't
       // what it seems can read a deity-commanded weather shift as one more

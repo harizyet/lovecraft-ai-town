@@ -1645,6 +1645,63 @@ export class CultSystem {
     }
   }
 
+  private static readonly SIDE_EFFECT_CHANCE = 0.15
+  private static readonly SIDE_EFFECTS_BY_REQUEST_KIND: Record<string, string[]> = {
+    better_weather: [
+      'the well water has turned an oily black overnight',
+      'livestock refuse to drink from the stream',
+      'crops sprouted overnight in places no one planted them',
+      'a strange fog lingers long after the rain stopped',
+    ],
+    heal_member: [
+      'the healed wound left a scar shaped like no injury anyone recognizes',
+      'another villager fell inexplicably ill that same night',
+      'the healed villager has taken to sleepwalking toward the shrine',
+    ],
+    bless_member: [
+      'a nearby well ran dry',
+      "the blessed villager's shadow seems to linger a moment too long",
+      'livestock nearby grew restless and would not settle',
+    ],
+    leader_power: [
+      'a nearby well ran dry',
+      'livestock nearby grew restless and would not settle',
+    ],
+    grow_influence: [
+      'a nearby well ran dry',
+      'crows have gathered over the village in numbers no one can explain',
+    ],
+    punish_nonbeliever: [
+      'the punishment stirred up old rumors no one asked for',
+      'a raven has refused to leave the site since',
+    ],
+  }
+
+  // A request being fulfilled doesn't always come with nothing else
+  // attached: an answered prayer can carry an unrelated, unexplained side
+  // effect, leaving the cult unsure whether they were truly rewarded or
+  // whether something else entirely is going on.
+  private maybeTriggerSideEffect(agent: Agent, request: CultRequest, eventId: string): void {
+    const options = CultSystem.SIDE_EFFECTS_BY_REQUEST_KIND[request.kind]
+    if (!options || Math.random() >= CultSystem.SIDE_EFFECT_CHANCE) return
+    const twist = options[Math.floor(Math.random() * options.length)]
+    const cultId = agent.state.cult?.id
+    const witnesses = cultId
+      ? this.deps.getAgents().filter((candidate) => candidate.state.alive && candidate.state.cult?.id === cultId)
+      : [agent]
+    const event = this.deps.eventBus.emit({
+      type: 'divine_side_effect',
+      agentId: agent.state.id,
+      actionType: ActionType.PRAY,
+      outcome: 'side_effect',
+      description: `In the wake of the answered prayer, ${twist} -- no one is certain if it's connected.`,
+      causationIds: [eventId],
+      worldStateDelta: { requestId: request.id, requestKind: request.kind },
+      observers: witnesses.map((witness) => witness.state.id),
+    })
+    for (const witness of witnesses) witness.addRecentMemory(event)
+  }
+
   public fulfillRequestsFromGodAbility(
     ability: 'bless' | 'heal' | 'smite' | 'resurrect' | 'manifest' | 'weather',
     target: Agent | undefined,
@@ -1664,6 +1721,7 @@ export class CultSystem {
         request.fulfilledAtMinute = this.deps.getAbsoluteMinute()
         request.fulfilledByEventId = eventId
         agent.state.cultDesperation = undefined
+        this.maybeTriggerSideEffect(agent, request, eventId)
       }
     }
   }
