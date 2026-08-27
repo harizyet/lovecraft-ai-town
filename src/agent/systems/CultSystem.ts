@@ -578,6 +578,20 @@ export class CultSystem {
     )
   }
 
+  public findNearestConvertTarget(agent: Agent, cult: { id: string }): Agent | undefined {
+    const candidates = this.deps.getAgents().filter((candidate) =>
+      candidate.state.id !== agent.state.id &&
+      candidate.state.alive &&
+      !candidate.state.demon &&
+      this.isConvertibleToCult(candidate, cult.id) &&
+      !this.deps.isConversionImmune(candidate) &&
+      !this.isChristianCultConversionBlocked(candidate, cult.id)
+    )
+    if (candidates.length === 0) return undefined
+    candidates.sort((a, b) => agent.distanceTo(a.state) - agent.distanceTo(b.state))
+    return candidates[0]
+  }
+
   public findEmptySummoningBuilding(
     requestedName?: string | null,
     ignoredAgentIds: Set<string> = new Set(),

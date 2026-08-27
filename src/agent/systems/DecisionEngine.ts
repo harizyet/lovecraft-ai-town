@@ -675,8 +675,20 @@ export class DecisionEngine {
       }
 
       case 'preach': {
-        const shrine = agent.state.cult ? this.systems.cultSystem.findCultShrine(agent.state.cult.id) : undefined
-        if (shrine) {
+        const cult = agent.state.cult
+        const shrine = cult ? this.systems.cultSystem.findCultShrine(cult.id) : undefined
+        const convertTarget = cult ? this.systems.cultSystem.findNearestConvertTarget(agent, cult) : undefined
+        const preachApproachRadius = CultSystem.PREACH_LISTEN_RADIUS - 3
+        if (convertTarget && agent.distanceTo(convertTarget.state) > preachApproachRadius) {
+          decision.target = convertTarget.state.name
+          agent.moveTo(Math.round(convertTarget.state.position.x), Math.round(convertTarget.state.position.y))
+          description = `${agent.state.name} set out from ${shrine ? shrine.name : 'their sanctuary'} to seek out ${convertTarget.state.name} and preach to them.`
+        } else if (convertTarget) {
+          decision.target = convertTarget.state.name
+          agent.state.path = []
+          agent.state.pathIndex = 0
+          description = `${agent.state.name} began preaching to ${convertTarget.state.name}: ${decision.reasoning}`
+        } else if (shrine) {
           const center = this.systems.cultSystem.getSummoningBuildingCenter(shrine)
           if (Math.hypot(agent.state.position.x - center.x, agent.state.position.y - center.y) > 3) {
             agent.moveTo(center.x, center.y)

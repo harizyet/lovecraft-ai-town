@@ -467,6 +467,7 @@ export class JusticeSystem {
         result = this.buildFallbackCourtVote(voter, accused, courtRumours)
       }
       result = this.deps.applyCultCourtInfluence(voter, accused, court, result)
+      result = this.enforceBeliefConsistentCourtVote(voter, courtRumours, result)
       const reasoning = result.reasoning.trim() || 'the available evidence and my beliefs support this outcome'
       const originalStatement = this.isWeakCourtStatement(result.statement)
         ? ''
@@ -494,6 +495,44 @@ export class JusticeSystem {
   public isWeakCourtStatement(statement: string): boolean {
     const cleaned = statement.trim()
     return cleaned.length < 20 || /nothing (further|more) to (add|say)|no comment|decline to (comment|answer)/i.test(cleaned)
+  }
+
+  // Cult members follow their bloc's directed vote regardless of personal
+  // belief (see applyCultCourtInfluence), so this only constrains voters
+  // outside any cult: an undecided or disbelieving voter should not be able
+  // to punish, and execution specifically requires an actually-held,
+  // high-confidence belief in a grave claim rather than a nominal LLM choice.
+  private enforceBeliefConsistentCourtVote(
+    voter: Agent,
+    claims: Rumour[],
+    vote: Omit<CourtVote, 'agentId'>
+  ): Omit<CourtVote, 'agentId'> {
+    if (voter.state.cult || vote.choice === 'absolve') return vote
+    const beliefs = claims.map((claim) => claim.beliefs.find((belief) => belief.agentId === voter.state.id))
+    const believedClaims = claims.filter((_claim, index) => beliefs[index]?.stance === 'believer')
+    if (believedClaims.length === 0) {
+      return {
+        ...vote,
+        choice: 'absolve',
+        statement: 'I remain unconvinced by these accusations and will not punish someone for claims I do not believe.',
+        reasoning: 'I do not actually believe the accusation, so I cannot in good conscience vote to punish',
+      }
+    }
+    if (vote.choice === 'execute') {
+      const strongestConfidence = Math.max(0, ...beliefs.map((belief) =>
+        belief?.stance === 'believer' ? belief.confidence ?? (belief.extreme || belief.seeded ? 1 : 0.8) : 0
+      ))
+      const graveClaim = believedClaims.some((claim) => isCourtEligibleRumour(claim))
+      if (!graveClaim || strongestConfidence < 0.85) {
+        return {
+          ...vote,
+          choice: 'exile',
+          statement: `I believe ${believedClaims.length === 1 ? 'this accusation' : 'these accusations'}, but not with enough certainty to take a life; I vote for exile instead.`,
+          reasoning: 'my belief in the accusation is not firm enough to warrant execution, so I favor exile',
+        }
+      }
+    }
+    return vote
   }
 
   private buildFallbackCourtDefense(accused: Agent, claims: Rumour[]): string {

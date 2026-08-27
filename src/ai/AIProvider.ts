@@ -740,10 +740,12 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     const content = String(data.choices?.[0]?.message?.content ?? '{}')
     const parsed = this.parseJSONObject(content)
     const rawChoice = String(parsed.choice ?? '').toLowerCase()
-    const choice: PolicyVote['choice'] = rawChoice === 'oppose' ? 'oppose' : 'support'
+    if (rawChoice !== 'support' && rawChoice !== 'oppose') {
+      throw new Error(`[AI] Policy vote choice unparseable: ${JSON.stringify(parsed.choice)}`)
+    }
     this.queryStats.successful++
     return {
-      choice,
+      choice: rawChoice,
       statement: String(parsed.statement || 'I have nothing further to add.').slice(0, 400),
       reasoning: String(parsed.reasoning || 'Based on my own interests and the village\'s needs.').slice(0, 400),
     }

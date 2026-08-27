@@ -2,6 +2,7 @@ import { Agent } from '@/agent/Agent'
 import { ActionType, AgentAction, Building, BuildingType, DailySchedule, EmotionalState, ScheduleBlock } from '@/types'
 import { PropheticTask } from '@/ai/AIProvider'
 import { MIN_BRIBE_WEALTH } from './PoliticalSystem'
+import { CultSystem } from './CultSystem'
 import { ActiveBlockEntry, SystemDeps } from './SystemDeps'
 
 const SPONTANEOUS_NIGHTMARE_FLAVORS = [
@@ -408,11 +409,14 @@ export class ScheduleSystem {
         }
       }
       if (active.action.action === 'preach') {
+        const preachTarget = active.action.target ? this.deps.findAgentByName(active.action.target, this.deps.getAgents()) : undefined
         const shrine = agent.state.cult ? this.deps.findCultShrine(agent.state.cult.id) : undefined
-        const stillTraveling = shrine && (() => {
-          const center = this.deps.getSummoningBuildingCenter(shrine)
-          return Math.hypot(agent.state.position.x - center.x, agent.state.position.y - center.y) > 3
-        })()
+        const stillTraveling = preachTarget?.state.alive
+          ? agent.distanceTo(preachTarget.state) > CultSystem.PREACH_LISTEN_RADIUS - 3
+          : Boolean(shrine) && (() => {
+              const center = this.deps.getSummoningBuildingCenter(shrine!)
+              return Math.hypot(agent.state.position.x - center.x, agent.state.position.y - center.y) > 3
+            })()
         if (stillTraveling) {
           this.startBlock(agent, { ...active.action, durationMinutes: 15 }, [active.eventId])
           continue
