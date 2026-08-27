@@ -469,7 +469,7 @@ export class AgentManager {
     this.religionSystem.state.religiousFervourTargets = new Map(snapshot.religiousFervourTargets ?? [])
     this.rumourSystem.state.divineEvangelismKeys = new Set(snapshot.divineEvangelismKeys ?? [])
     this.religionSystem.state.prophetAgentId = snapshot.prophetAgentId ??
-      this.agents.find((agent) => agent.state.currentJob === 'Prophet')?.state.id ?? null
+      this.agents.find((agent) => agent.state.currentJob === 'Prophet' || agent.state.secretProphet)?.state.id ?? null
     this.religionSystem.state.prophetVacantAfterDeath = snapshot.prophetVacantAfterDeath ?? false
     this.scheduleSystem.state.idleSinceMinute = new Map(snapshot.idleSinceMinute ?? [])
     this.religionSystem.state.interpretedProphecyRumourIds = new Set(snapshot.interpretedProphecyRumourIds ?? [])

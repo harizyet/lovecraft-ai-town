@@ -88,6 +88,8 @@ export class StoryNarrationPanel {
         return 'A Rite Unspeakable'
       case 'priest_corrupted':
         return 'A Shepherd Turns'
+      case 'cult_leader_corrupted':
+        return 'A Trusted Face Turns'
       case 'church_corrupted':
         return 'The Congregation Reborn'
       case 'flock_corrupted':

@@ -487,7 +487,7 @@ export interface Rumour {
   timelineSummary?: string
 }
 
-export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight' | 'forbidden_relic_created' | 'deity_relic_created' | 'alderman_named' | 'knight_called' | 'inquisitor_called' | 'knight_killed' | 'inquisitor_killed' | 'only_cultists_survive' | 'cult_leader_sole_survivor' | 'cults_extinguished'
+export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'cult_leader_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight' | 'forbidden_relic_created' | 'deity_relic_created' | 'alderman_named' | 'knight_called' | 'inquisitor_called' | 'knight_killed' | 'inquisitor_killed' | 'only_cultists_survive' | 'cult_leader_sole_survivor' | 'cults_extinguished'
 
 export interface StoryMoment {
   id: string
@@ -631,10 +631,16 @@ export interface AgentState {
     sinceMinute: number
   }
   // True when this agent is secretly the village's Prophet and true cult
-  // leader while their public currentJob is deliberately left unchanged
-  // (e.g. a Priest whose whispered corruption stays hidden behind their
-  // ordinary church duties, Innsmouth-style).
+  // leader while their public currentJob is deliberately left unchanged --
+  // whatever their ordinary trade, it stays their cover, Innsmouth-style.
+  // Any cult founder/leader (not only a Priest, not only the seeded Church
+  // of Christ) goes secret this way; see prophetFormerJob below.
   secretProphet?: boolean
+  // The mundane job this agent held immediately before becoming the
+  // village's Prophet. Kept so that if they later found or take over a
+  // cult in secret, their currentJob can be restored to this cover
+  // identity instead of staying publicly labelled "Prophet".
+  prophetFormerJob?: string
   cultConversionProgress?: Record<string, number>
   blessing?: {
     sourceAgentId: string

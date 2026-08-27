@@ -1266,10 +1266,10 @@ export class ReligionSystem {
       this.state.prophetVacantAfterDeath = true
     }
 
-    const isFoundingPriest = agent.state.currentJob === 'Priest' &&
-      agent.state.cult?.role === 'founder' &&
-      agent.state.cult.id.startsWith('cult_christian_')
-    if (isFoundingPriest && Math.random() >= this.priestCorruptionChance(agent)) {
+    const isExistingCultLeader = agent.state.cult?.role === 'founder' || agent.state.cult?.role === 'leader'
+    const isChurchOfChrist = agent.state.cult?.id.startsWith('cult_christian_') ?? false
+    const goesSecret = isExistingCultLeader
+    if (goesSecret && Math.random() >= this.priestCorruptionChance(agent)) {
       const resistedEvent = this.deps.eventBus.emit({
         type: 'prophet_appointed',
         agentId: agent.state.id,
@@ -1288,7 +1288,8 @@ export class ReligionSystem {
     this.state.prophetVacantAfterDeath = false
     this.state.lastDailyPropheticClaimDay = this.deps.getCurrentDay()
     const formerJob = agent.state.currentJob
-    if (isFoundingPriest) {
+    agent.state.prophetFormerJob = formerJob
+    if (goesSecret) {
       agent.state.secretProphet = true
     } else {
       agent.state.currentJob = 'Prophet'
@@ -1307,9 +1308,9 @@ export class ReligionSystem {
       type: 'prophet_appointed',
       agentId: agent.state.id,
       actionType: ActionType.IDLE,
-      outcome: isFoundingPriest ? 'became_secret_prophet' : 'became_prophet',
-      description: isFoundingPriest
-        ? `${agent.state.name} still wears the collar of the village Priest, but something else now looks out through their eyes -- they knelt in secret and submitted to the voice of ${deityName}, which had whispered: "${rumour.text}"`
+      outcome: goesSecret ? 'became_secret_prophet' : 'became_prophet',
+      description: goesSecret
+        ? `${agent.state.name} still carries on as ${formerJob ?? 'before'}, but something else now looks out through their eyes -- they knelt in secret and submitted to the voice of ${deityName}, which had whispered: "${rumour.text}"`
         : `${agent.state.name} knelt and submitted to the voice of ${deityName}, which had whispered: "${rumour.text}" -- and became the village's Prophet.`,
       causationIds: [],
       worldStateDelta: {
@@ -1317,21 +1318,23 @@ export class ReligionSystem {
         formerJob,
         currentJob: agent.state.currentJob,
         deityName,
-        secret: isFoundingPriest,
+        secret: goesSecret,
       },
       observers: [agent.state.id],
     })
     this.deps.story.queueStoryMoment(
-      isFoundingPriest ? 'priest_corrupted' : 'prophet_appointed',
+      isChurchOfChrist ? 'priest_corrupted' : goesSecret ? 'cult_leader_corrupted' : 'prophet_appointed',
       agent.state.name,
-      isFoundingPriest
+      isChurchOfChrist
         ? `${agent.state.name}, the village's own Priest and founder of The Church of Christ, secretly submitted to a whispered demand from ${deityName} -- "${rumour.text}" -- and accepted whatever forbidden truth it promised in return. To their congregation nothing appears to change; in private they now serve a far older and hungrier truth.`
+        : goesSecret
+        ? `${agent.state.name}, already the secret leader of ${agent.state.cult?.name ?? 'a hidden congregation'} while outwardly still working as ${formerJob ?? 'an ordinary villager'}, secretly submitted to a whispered demand from ${deityName} -- "${rumour.text}" -- and accepted whatever forbidden truth it promised in return. To their neighbours nothing appears to change; in private they now serve a far older and hungrier truth. Set this scene at their trade, not inside any church.`
         : `${agent.state.name}, a ${formerJob ?? 'commoner'} with no tie to any church or clergy, was at their ordinary work as a ${formerJob ?? 'commoner'} when they knelt where they stood and submitted to ${deityName}'s whispered demand -- "${rumour.text}" -- and became the village's Prophet, carrying whatever truth was bestowed on them in exchange. Set this scene at their trade, not inside any church.`,
       agent.state.id,
       event.id
     )
     agent.addRecentMemory(event)
-    if (isFoundingPriest) void this.corruptChurchOfChrist(agent, rumour, event.id)
+    if (isChurchOfChrist) void this.corruptChurchOfChrist(agent, rumour, event.id)
     this.queuePropheticInterpretation(agent, rumour, deityName, event.id)
   }
 

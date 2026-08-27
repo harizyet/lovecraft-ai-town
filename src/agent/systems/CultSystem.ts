@@ -777,7 +777,7 @@ export class CultSystem {
   public formCult(prophet: Agent, task: PropheticTask, causationId: string): void {
     if (
       !prophet.state.alive ||
-      prophet.state.currentJob !== 'Prophet' ||
+      (prophet.state.currentJob !== 'Prophet' && !prophet.state.secretProphet) ||
       this.deps.getProphetAgentId() !== prophet.state.id
     ) return
     if (prophet.state.cult?.role === 'leader' || prophet.state.cult?.role === 'founder') return
@@ -791,20 +791,34 @@ export class CultSystem {
     }
     prophet.state.cult = cult
     prophet.state.cultAgendas = this.createCultLeaderAgendas(prophet)
+
+    // Every cult leader stays secret, regardless of job or how they came to
+    // lead: if this prophet had been publicly outed, fold that identity back
+    // beneath their old cover trade now that they actually have a flock.
+    const wasPublicProphet = prophet.state.currentJob === 'Prophet'
+    if (wasPublicProphet) {
+      prophet.state.currentJob = prophet.state.prophetFormerJob ?? prophet.state.currentJob
+      prophet.state.secretProphet = true
+    }
+
     const event = this.deps.eventBus.emit({
       type: 'cult_formed',
       agentId: prophet.state.id,
       actionType: ActionType.TALK,
       outcome: 'founded',
-      description: `${prophet.state.name} founded the cult "${name}" in response to the revelation.`,
+      description: wasPublicProphet
+        ? `${prophet.state.name} founded the cult "${name}" in response to the revelation, then quietly resumed life as ${prophet.state.currentJob ?? 'an ordinary villager'} so no one would suspect what they now lead in secret.`
+        : `${prophet.state.name} founded the cult "${name}" in response to the revelation.`,
       causationIds: [causationId],
-      worldStateDelta: { cultId: cult.id, cultName: name, role: 'leader' },
+      worldStateDelta: { cultId: cult.id, cultName: name, role: 'leader', secret: wasPublicProphet },
       observers: [prophet.state.id],
     })
     this.deps.story.queueStoryMoment(
-      'cult_formed',
+      wasPublicProphet ? 'cult_leader_corrupted' : 'cult_formed',
       name,
-      `${prophet.state.name}, the village's Prophet, founded a new cult named "${name}" in response to a divine revelation.`,
+      wasPublicProphet
+        ? `${prophet.state.name} founded a new cult named "${name}" in response to a divine revelation, then folded that identity back beneath their old, ordinary trade as ${prophet.state.currentJob ?? 'a villager'} -- to their neighbours nothing appears to have changed, but in private they now lead a hidden congregation.`
+        : `${prophet.state.name}, the village's Prophet, founded a new cult named "${name}" in response to a divine revelation.`,
       prophet.state.id,
       event.id
     )

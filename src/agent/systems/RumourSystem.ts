@@ -1891,9 +1891,10 @@ Your private reaction: ${thoughtEvent.description}`,
     }
 
     // A secret prophet's entire cover depends on outwardly appearing like an
-    // ordinary, composed Priest (see PromptBuilder's secretProphet framing);
-    // visibly panicking the instant they're corrupted would blow that cover,
-    // so their damaged sanity stays hidden behind a calm face.
+    // ordinary, composed villager in their usual trade (see PromptBuilder's
+    // secretProphet framing); visibly panicking the instant they're
+    // corrupted would blow that cover, so their damaged sanity stays hidden
+    // behind a calm face.
     if (recipient.state.sanity <= 40 && !recipient.state.secretProphet &&
       (interpretation.reaction === 'madness' || interpretation.reaction === 'nihilism' || interpretation.reaction === 'obsession')) {
       recipient.state.emotionalState = interpretation.reaction === 'madness' ? EmotionalState.PANICKED : recipient.state.emotionalState

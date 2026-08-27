@@ -1384,7 +1384,7 @@ export class DebugOverlay {
     if (agent.secretProphet) {
       markers.push({
         icon: '🐟',
-        label: 'Secret Prophet (corrupted Priest)',
+        label: `Secret Prophet (corrupted ${agent.currentJob ?? 'villager'})`,
         color: '#b7e1d8',
         background: '#0f2e28',
         border: '#3a8e73',

@@ -157,7 +157,7 @@ export class ScheduleSystem {
       action.reasoning = 'Construction is disabled; returning to ordinary work'
     }
     const isCultLeader = agent.state.cult != null && ['leader', 'founder'].includes(agent.state.cult.role)
-    if ((agent.state.currentJob === 'Prophet' || isCultLeader) && action.action === 'work') {
+    if ((agent.state.currentJob === 'Prophet' || isCultLeader) && !agent.state.secretProphet && action.action === 'work') {
       action.action = agent.state.cult ? 'preach' : 'pray'
       action.target = this.deps.findBuildingOfType(agent, 'church')?.name ?? null
       action.dialogue = ''
@@ -300,7 +300,12 @@ export class ScheduleSystem {
       if ((this.deps.decisionQueue.get(agent.state.id)?.length ?? 0) > 0) continue
       if (this.deps.pendingDecisions.has(agent.state.id)) continue
       const jobBuilding = this.deps.findJobBuilding(agent)
-      const isDivine = agent.state.currentJob === 'Priest' || agent.state.currentJob === 'Prophet' || agent.state.cult !== undefined
+      // A secret prophet/cult leader must not have their fallback activity
+      // reveal them: unless their cover job is already Priest (where
+      // praying/preaching at church is unremarkable), fall back to their
+      // ordinary trade instead of outing them via church attendance.
+      const isDivine = agent.state.currentJob === 'Priest' || agent.state.currentJob === 'Prophet' ||
+        (agent.state.cult !== undefined && !agent.state.secretProphet)
       const isPreaching = agent.state.cult?.role === 'leader' || agent.state.currentJob === 'Priest'
       this.startBlock(agent, {
         action: isDivine ? (agent.state.cult ? 'preach' : 'pray') : 'work',
