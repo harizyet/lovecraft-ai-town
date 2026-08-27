@@ -663,6 +663,15 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
         .replace(/\\"/g, '"')
         .trim()
       if (rest.length > 40) return this.trimToSentence(rest, 3600)
+      // A valid JSON object was found (usually just {"title": "..."}) and
+      // there is no meaningful text left outside it -- the model returned
+      // only the title and never wrote a narration at all. Report empty
+      // rather than falling into the raw-strip fallback below, which would
+      // otherwise treat the object's own "key":"value" text (with only its
+      // outer braces stripped) as if it were the narrative prose. The empty
+      // result makes the caller throw and retry instead of chronicling a
+      // stray JSON fragment.
+      if (embedded.json) return ''
     }
 
     // No recognizable structured field at all -- the model ignored the JSON

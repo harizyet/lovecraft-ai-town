@@ -20,6 +20,7 @@ import { PolicyPanel } from '@/rendering/PolicyPanel'
 import { DeityChatPanel } from '@/rendering/DeityChatPanel'
 import { StoryNarrationPanel } from '@/rendering/StoryNarrationPanel'
 import { StoryLogPanel } from '@/rendering/StoryLogPanel'
+import { RelicInfoPanel } from '@/rendering/RelicInfoPanel'
 import { LLMErrorPanel } from '@/rendering/LLMErrorPanel'
 import { EventBus } from '@/interaction/EventBus'
 
@@ -37,6 +38,7 @@ export class SimulationManager {
   private deityChatPanel: DeityChatPanel
   private storyNarrationPanel: StoryNarrationPanel
   private storyLogPanel: StoryLogPanel
+  private relicInfoPanel: RelicInfoPanel
   private deityChatAutoPaused: boolean
   private eventBus: EventBus
   private config: SimulationConfig
@@ -114,6 +116,7 @@ export class SimulationManager {
     this.deityChatPanel = new DeityChatPanel()
     this.storyNarrationPanel = new StoryNarrationPanel()
     this.storyLogPanel = new StoryLogPanel()
+    this.relicInfoPanel = new RelicInfoPanel()
     this.llmErrorPanel = new LLMErrorPanel(() => {
       window.dispatchEvent(new CustomEvent('debug-refresh-agents'))
     })
@@ -500,6 +503,15 @@ export class SimulationManager {
 
     const tileX = Math.floor(worldPos.x / tileSize)
     const tileY = Math.floor(worldPos.y / tileSize)
+
+    for (const relic of this.world.relics.values()) {
+      const relicTileX = Math.round(relic.position.x)
+      const relicTileY = Math.round(relic.position.y)
+      if (tileX === relicTileX && tileY === relicTileY) {
+        this.relicInfoPanel.open(relic)
+        return
+      }
+    }
 
     for (const agent of this.agentManager.getAgents()) {
       const agentTileX = Math.round(agent.state.position.x)
