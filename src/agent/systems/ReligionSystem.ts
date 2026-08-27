@@ -205,6 +205,7 @@ export class ReligionSystem {
     this.deps.simManager.addAgent(demon.state)
     this.deps.llmRequestStatuses.set(demon.state.id, 'idle')
     this.state.demonSummonCredits--
+    this.deps.saturateMapCorruption()
 
     const witnesses = this.deps.getAgents().filter((witness) =>
       witness.state.alive &&

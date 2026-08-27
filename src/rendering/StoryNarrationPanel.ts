@@ -98,6 +98,18 @@ export class StoryNarrationPanel {
         return 'A Faith Renounced'
       case 'deity_ability_first_used':
         return this.deityAbilityTitleFor(moment.title.toLowerCase())
+      case 'deity_relic_created':
+        return 'A Relic Not Made By Human Hands'
+      case 'alderman_named':
+        return 'The Office of Alderman'
+      case 'knight_called':
+        return 'A Knight Rides In'
+      case 'inquisitor_called':
+        return 'The Inquisitor Arrives'
+      case 'knight_killed':
+        return 'The Knight Falls'
+      case 'inquisitor_killed':
+        return 'The Inquisitor Falls'
       default:
         return 'From the Village Chronicle'
     }

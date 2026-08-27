@@ -12,6 +12,7 @@ import {
   WeatherCondition,
   PolicySession,
   StoryMoment,
+  SimulationEvent,
 } from '@/types'
 import { AIProvider, LLMQueryStats, PropheticTask } from '@/ai/AIProvider'
 import { PromptBuilder } from '@/ai/PromptBuilder'
@@ -133,6 +134,7 @@ export class AgentManager {
       getAbsoluteMinute: () => this.getAbsoluteMinute(),
       getMinuteOfDay: () => this.getMinuteOfDay(),
       getTownCorruptionLevel: () => this.getTownCorruptionLevel(),
+      saturateMapCorruption: () => this.environmentSystem.saturateWholeMap(),
 
       runLLMRequestWithRetry: (agentId, label, request, maxAttempts) =>
         this.runLLMRequestWithRetry(agentId, label, request, maxAttempts),
@@ -308,7 +310,28 @@ export class AgentManager {
       this.religionSystem.registerGodInvocation(event)
       this.cultSystem.fulfillPunishmentRequestsFromEvent(event)
       this.cultSystem.handleCultLeaderKilled(event)
+      this.handleOutsiderKilled(event)
     })
+  }
+
+  // A Knight or Inquisitor is an outsider called in specifically to protect
+  // or judge the village; their death is a distinct narrative beat from an
+  // ordinary villager's, so it's detected here off the same 'attack' death
+  // event handleCultLeaderKilled already watches, rather than threading a
+  // story-moment call through every kill path (combat, sacrifice) that could
+  // end an outsider's life.
+  private handleOutsiderKilled(event: SimulationEvent): void {
+    if (event.type !== 'attack' || event.outcome !== 'death' || !event.targetId) return
+    const victim = this.agents.find((agent) => agent.state.id === event.targetId)
+    const kind = victim?.state.outsider?.kind
+    if (!victim || (kind !== 'knight' && kind !== 'inquisitor')) return
+    this.storySystem.queueStoryMoment(
+      kind === 'knight' ? 'knight_killed' : 'inquisitor_killed',
+      victim.state.name,
+      event.description,
+      victim.state.id,
+      event.id
+    )
   }
 
 

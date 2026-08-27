@@ -103,6 +103,10 @@ export interface SystemDeps {
   // a cult. Drives the odds that a cult-unaligned sleeper spontaneously has
   // a nightmare (see ScheduleSystem).
   getTownCorruptionLevel(): number
+  // Instantly saturates every tile on the map to full (1.0) corruption --
+  // used when the bound Demon manifests, whose arrival should read as a
+  // total, map-wide shock rather than the usual slow radial spread.
+  saturateMapCorruption(): void
 
   // Court and the policy assembly cannot run at the same time; each needs to
   // know whether the other currently has the floor.

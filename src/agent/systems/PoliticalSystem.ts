@@ -324,7 +324,11 @@ export class PoliticalSystem {
           : ` You are not part of ${session.targetCultName}. Handing one person unchecked control over the court and the village's votes is a direct threat to your own safety and standing; you have every reason to refuse.`
       }`
     } else {
-      effectContext = `If passed, every living ${session.targetJob} gains wealth.`
+      effectContext = `If passed, the village spends its funds so that every living ${session.targetJob} gains wealth.${
+        voter.state.politicalCamp?.id === 'gentry'
+          ? ' As a member of the Gentry, you are instinctively wary of spending the village\'s money this way and lean toward voting against it unless it directly serves you.'
+          : ''
+      }`
     }
     const selfInterest = effect === 'wealth' && voter.state.currentJob === session.targetJob
       ? `\nThis proposal directly benefits your own trade (${voter.state.currentJob}); supporting it would raise your own wealth.`
@@ -444,8 +448,10 @@ export class PoliticalSystem {
           }
     }
     const camp = voter.state.politicalCamp?.id
+    // Spending the village's funds cuts against gentry instincts regardless of who benefits;
+    // they mainly come around when the spending directly lines their own pocket (selfInterestBoost below).
     const campLean = camp === 'gentry'
-      ? (session.targetJob === 'Merchant' || session.targetJob === 'Steward' ? 0.25 : -0.1)
+      ? -0.4
       : camp === 'commons'
         ? (session.targetJob === 'Merchant' ? -0.15 : 0.15)
         : 0
@@ -474,9 +480,11 @@ export class PoliticalSystem {
     return {
       choice,
       reasoning: camp === 'gentry'
-        ? 'I am not convinced this is the wisest use of the village\'s resources'
+        ? 'the village\'s coffers should not be spent so freely'
         : 'I do not see how this helps people like me',
-      statement: 'I am not convinced and vote against this.',
+      statement: camp === 'gentry'
+        ? 'The village should not spend its money so carelessly, and I vote against this.'
+        : 'I am not convinced and vote against this.',
     }
   }
 
@@ -613,6 +621,7 @@ export class PoliticalSystem {
 
     const effect = session.effect ?? 'wealth'
     let beneficiaries: Agent[] = []
+    let newlyNamedAlderman: Agent | undefined
     let worldStateDelta: Record<string, unknown> = {
       policySessionId: session.id,
       effect,
@@ -664,6 +673,7 @@ export class PoliticalSystem {
         }
         session.resolution = `Every living villager voted to support it, and ${leader.state.name} is named Village Alderman, ` +
           `with binding authority over the resolution court and future assembly votes.`
+        newlyNamedAlderman = leader
       } else if (leader) {
         session.resolution = `The vote to name ${leader.state.name} as Alderman required every living villager to agree, ` +
           `and it was not unanimous. ${leader.state.name} remains without office.`
@@ -707,6 +717,16 @@ export class PoliticalSystem {
       observers: session.participantIds,
     })
     for (const agent of this.deps.getAgents().filter((candidate) => candidate.state.alive)) agent.addRecentMemory(event)
+
+    if (newlyNamedAlderman) {
+      this.deps.story.queueStoryMoment(
+        'alderman_named',
+        newlyNamedAlderman.state.name,
+        session.resolution ?? '',
+        newlyNamedAlderman.state.id,
+        event.id
+      )
+    }
 
     this.state.activePolicySessionId = null
     this.deps.resumeSchedulesAfterCourt(session.participantIds)

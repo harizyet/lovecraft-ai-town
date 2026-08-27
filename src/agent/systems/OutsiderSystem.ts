@@ -106,6 +106,13 @@ export class OutsiderSystem {
       observers: witnesses.map((agent) => agent.state.id),
     })
     for (const witness of witnesses) witness.addRecentMemory(event)
+    this.deps.story.queueStoryMoment(
+      kind === 'knight' ? 'knight_called' : 'inquisitor_called',
+      outsider.state.name,
+      event.description,
+      outsider.state.id,
+      event.id
+    )
     return outsider
   }
 

@@ -162,6 +162,25 @@ export class EnvironmentSystem {
     return sources
   }
 
+  // A bound Demon's manifestation is instantaneous and total: rather than
+  // letting corruption crawl outward from the summoning site at the usual
+  // GROWTH_RATE, this slams every tile on the map to full corruption (1.0)
+  // the moment the Demon is created. Tiles outside the Demon's own
+  // DEMON_RADIUS will still decay back down over time via the normal
+  // advanceCorruption loop once they're no longer touched by any source --
+  // this only guarantees the map-wide shock of the manifestation itself.
+  public saturateWholeMap(): void {
+    const world = this.deps.world
+    for (let y = 0; y < world.height; y++) {
+      for (let x = 0; x < world.width; x++) {
+        const key = tileKey(x, y)
+        this.state.corruption.set(key, 1)
+        const tile = world.getTile(x, y)
+        if (tile) tile.corruption = 1
+      }
+    }
+  }
+
   // Advances the corruption field by one simulated minute. Cheap to call
   // every frame: it no-ops until the absolute minute actually changes, then
   // only walks the bounding boxes of active sources plus the sparse set of

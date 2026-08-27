@@ -241,6 +241,6 @@ export class RelicSystem {
       agent.addRecentMemory(event)
     }
 
-    this.deps.story.queueStoryMoment('forbidden_relic_created', relic.title, description, 'world', event.id)
+    this.deps.story.queueStoryMoment('deity_relic_created', relic.title, description, 'world', event.id)
   }
 }
