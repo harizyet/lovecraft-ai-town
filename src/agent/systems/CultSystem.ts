@@ -2335,6 +2335,10 @@ export class CultSystem {
       if (!agent.state.alive) continue
       const role = agent.state.cult?.role
       if (role !== 'leader' && role !== 'founder') continue
+      // The seeded "Church of Christ" founder is an ordinary, uncorrupted
+      // priest, not a covert cult leader -- schemes only make sense once
+      // corruptChurchOfChrist has flipped their role to 'leader'.
+      if (role === 'founder' && agent.state.cult?.id.startsWith('cult_christian_')) continue
       if (agent.state.activeCultScheme) continue
       if ((this.state.lastCultSchemeProposalDay[agent.state.id] ?? -1) >= this.deps.getCurrentDay()) continue
 

@@ -19,6 +19,7 @@ import { CourtPanel } from '@/rendering/CourtPanel'
 import { PolicyPanel } from '@/rendering/PolicyPanel'
 import { DeityChatPanel } from '@/rendering/DeityChatPanel'
 import { StoryNarrationPanel } from '@/rendering/StoryNarrationPanel'
+import { StoryLogPanel } from '@/rendering/StoryLogPanel'
 import { LLMErrorPanel } from '@/rendering/LLMErrorPanel'
 import { EventBus } from '@/interaction/EventBus'
 
@@ -35,6 +36,7 @@ export class SimulationManager {
   private policyPanel: PolicyPanel
   private deityChatPanel: DeityChatPanel
   private storyNarrationPanel: StoryNarrationPanel
+  private storyLogPanel: StoryLogPanel
   private deityChatAutoPaused: boolean
   private eventBus: EventBus
   private config: SimulationConfig
@@ -111,6 +113,7 @@ export class SimulationManager {
     this.policyPanel = new PolicyPanel()
     this.deityChatPanel = new DeityChatPanel()
     this.storyNarrationPanel = new StoryNarrationPanel()
+    this.storyLogPanel = new StoryLogPanel()
     this.llmErrorPanel = new LLMErrorPanel(() => {
       window.dispatchEvent(new CustomEvent('debug-refresh-agents'))
     })
@@ -668,6 +671,7 @@ export class SimulationManager {
     this.courtPanel.update(this.agentManager.getRumours(), this.getAgentsArray())
     this.policyPanel.update(this.agentManager.getPolicySessions(), this.getAgentsArray())
     this.storyNarrationPanel.update(this.agentManager.getStoryMoments())
+    this.storyLogPanel.update(this.agentManager.getStoryMoments())
   }
 
   private updateSelectedAgentFollow(): void {

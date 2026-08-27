@@ -40,7 +40,7 @@ export class PromptBuilder {
 
 Facts: ${facts}
 
-Write the chronicle's narration of this moment. Set the scene using only the place and occupation stated in the facts above -- do not relocate it to a church or shrine unless the facts themselves say so.`
+Write the chronicle's narration of this moment in at least 3 paragraphs, and invent a title for this specific chronicle entry. Set the scene using only the place and occupation stated in the facts above -- do not relocate it to a church or shrine unless the facts themselves say so. The title must be drawn from these specific facts (the names, place, or act involved), not a generic label for this kind of moment -- two different moments of the same kind must never share a title.`
   }
 
   public buildDailyPropheticClaimPrompt(agent: Agent, allAgents: Agent[], day: number): string {

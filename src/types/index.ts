@@ -568,6 +568,12 @@ export interface StoryMoment {
   id: string
   kind: StoryMomentKind
   title: string
+  // LLM-generated, Lovecraft-inspired chronicle title, unique to this
+  // specific moment. Empty until the narration finishes (or falls back to
+  // `title` if generation fails). `title` itself stays the short, code-
+  // supplied context label -- shown as a subtitle so a moment's origin
+  // remains traceable for debugging even when the display title is prose.
+  headline: string
   narrative: string
   status: 'pending' | 'ready' | 'failed'
   createdAtMinute: number

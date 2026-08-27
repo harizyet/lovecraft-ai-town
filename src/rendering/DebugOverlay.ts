@@ -244,6 +244,7 @@ export class DebugOverlay {
           <button id="debug-speed" style="padding:4px 12px;background:#555;border:none;color:#fff;cursor:pointer;border-radius:3px;">Speed: 1x</button>
           <button id="debug-refresh-agents" style="padding:4px 12px;background:#1565c0;border:none;color:#fff;cursor:pointer;border-radius:3px;">Refresh Agents</button>
           <button id="debug-reset-village" style="padding:4px 12px;background:#b71c1c;border:none;color:#fff;cursor:pointer;border-radius:3px;">Reset Village State</button>
+          <button id="debug-story-log" style="padding:4px 12px;background:#5a6b4f;border:none;color:#e8e4d0;cursor:pointer;border-radius:3px;">Village Chronicle</button>
         </div>
         <div id="debug-refresh-agents-status" style="min-height:14px;margin-top:4px;color:#90caf9;font-size:10px;"></div>
       </section>
@@ -274,6 +275,10 @@ export class DebugOverlay {
     const speedBtn = panel.querySelector<HTMLButtonElement>('#debug-speed')
     const resetVillageBtn = panel.querySelector<HTMLButtonElement>('#debug-reset-village')
     const refreshAgentsBtn = panel.querySelector<HTMLButtonElement>('#debug-refresh-agents')
+    const storyLogBtn = panel.querySelector<HTMLButtonElement>('#debug-story-log')
+    storyLogBtn?.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('debug-toggle-story-log'))
+    })
     this.setupMinimisableSection(panel, 'god-abilities-toggle', 'god-abilities-content', 'deity abilities')
     this.setupMinimisableSection(panel, 'demon-summon-toggle', 'demon-summon-content', 'demon summon')
     panel.addEventListener('click', (event) => {

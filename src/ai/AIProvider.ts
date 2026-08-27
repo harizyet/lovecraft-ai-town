@@ -56,7 +56,7 @@ export interface AIProvider {
   interpretExistentialReaction(agentName: string, prompt: string): Promise<ExistentialReactionResult>
   generateCultName(claimText: string, revelationText: string): Promise<string>
   generateCultScheme(agentName: string, job: string, prompt: string): Promise<RawSchemeProposal>
-  narrateKeyMoment(prompt: string): Promise<string>
+  narrateKeyMoment(prompt: string): Promise<{ title: string; narrative: string }>
   getLastTransaction(agentName: string): { query: string; response: string } | undefined
   isAvailable(): boolean
   getQueryStats(): LLMQueryStats
@@ -583,7 +583,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     }
   }
 
-  public async narrateKeyMoment(prompt: string): Promise<string> {
+  public async narrateKeyMoment(prompt: string): Promise<{ title: string; narrative: string }> {
     if (!this.available) throw new Error('LLM not available')
     this.queryStats.made++
     const response = await this.fetchWithTracking(`${this.config.endpoint}/v1/chat/completions`, {
@@ -594,7 +594,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
         messages: [
           {
             role: 'system',
-            content: `You are the narrator of a small medieval village's chronicle, writing in the style of H.P. Lovecraft: dense, archaic, foreboding prose thick with cosmic dread, forbidden knowledge, and a mounting sense of ancient wrongness beneath the mundane. Return ONLY valid JSON: {"narrative":"one paragraph, 80-160 words, of florid Lovecraftian prose"}. Use only the facts given to you; do not invent new named people, places, or events beyond them. Ground the scene in whatever setting or occupation the facts actually state -- a field, a forge, a mill, a market stall, wherever the named villager is said to work or stand -- and do not default to a church, chapel, shrine, or "shadowed chamber" unless the facts explicitly place the moment there or name the villager a priest. Never break character, and never mention prompts, JSON, or simulation.`,
+            content: `You are the narrator of a small medieval village's chronicle, writing in the style of H.P. Lovecraft: dense, archaic, foreboding prose thick with cosmic dread, forbidden knowledge, and a mounting sense of ancient wrongness beneath the mundane. Return ONLY valid JSON: {"title":"a short, evocative Lovecraftian chronicle-entry title, 3-7 words, no surrounding quotes or trailing punctuation","narrative":"at least 3 paragraphs, separated by \\n\\n, roughly 220-420 words total, of florid Lovecraftian prose"}. The title must be unique to this specific moment's facts, not a generic restatement of the moment's category -- draw it from the actual names, places, or acts given. Use only the facts given to you; do not invent new named people, places, or events beyond them. Ground the scene in whatever setting or occupation the facts actually state -- a field, a forge, a mill, a market stall, wherever the named villager is said to work or stand -- and do not default to a church, chapel, shrine, or "shadowed chamber" unless the facts explicitly place the moment there or name the villager a priest. Never break character, and never mention prompts, JSON, or simulation.`,
           },
           { role: 'user', content: prompt },
         ],
@@ -605,10 +605,12 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     })
     if (!response.ok) throw new Error(`LLM error: ${response.status}`)
     const data = await response.json()
-    const narrative = this.extractNarrative(String(data.choices?.[0]?.message?.content ?? ''))
+    const content = String(data.choices?.[0]?.message?.content ?? '')
+    const narrative = this.extractNarrative(content)
     if (!narrative) throw new Error('[AI] Key moment narration is empty')
+    const title = this.extractTitle(content)
     this.queryStats.successful++
-    return narrative
+    return { title, narrative }
   }
 
   // The narration response is a single free-form prose field, so it doesn't
@@ -629,7 +631,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     const structured = this.tryStructuredJSONParse(stripped)
     if (structured) {
       const value = this.pickNarrativeField(structured)
-      if (value) return this.trimToSentence(value)
+      if (value) return this.trimToSentence(value, 3600)
     }
 
     // The model sometimes renames the requested "narrative" key (to "text",
@@ -641,7 +643,26 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
     const keyMatch = stripped.match(keyPattern)
     if (keyMatch && keyMatch.index !== undefined) {
       const value = this.readJSONStringValue(stripped, keyMatch.index + keyMatch[0].length)
-      if (value) return this.trimToSentence(value)
+      if (value) return this.trimToSentence(value, 3600)
+    }
+
+    // The model sometimes emits a small, fully-valid JSON object -- often
+    // just {"title": "..."} -- and then writes the actual narration as bare
+    // prose outside it entirely, rather than nesting it under a "narrative"
+    // key. tryStructuredJSONParse above only ever looks at the first-to-last
+    // brace span, so it silently returns that inner object and drops
+    // everything outside it. Recover that dropped prose here by cutting the
+    // embedded object back out and using whatever text is left, instead of
+    // falling through to the raw-strip fallback below, which only trims
+    // braces from the very start/end of the whole response and would leave
+    // a stray JSON fragment glued onto the real prose.
+    const embedded = this.extractFirstJSONObject(stripped)
+    if (embedded) {
+      const rest = `${embedded.before} ${embedded.after}`
+        .replace(/\\n/g, '\n')
+        .replace(/\\"/g, '"')
+        .trim()
+      if (rest.length > 40) return this.trimToSentence(rest, 3600)
     }
 
     // No recognizable structured field at all -- the model ignored the JSON
@@ -652,7 +673,39 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
       .replace(/\\n/g, '\n')
       .replace(/\\"/g, '"')
       .trim()
-    return this.trimToSentence(text)
+    return this.trimToSentence(text, 3600)
+  }
+
+  // Locates the first balanced {...} object anywhere in the text (honoring
+  // quoted strings, so braces inside prose or string values don't throw off
+  // the depth count) and parses it. Returns the surrounding text as
+  // `before`/`after` so a caller can recover prose the model wrote outside
+  // the JSON object instead of only the object's own fields.
+  private extractFirstJSONObject(content: string): { json: Record<string, unknown> | null; before: string; after: string } | null {
+    const start = content.indexOf('{')
+    if (start === -1) return null
+    let depth = 0
+    let inString = false
+    let escaped = false
+    for (let i = start; i < content.length; i++) {
+      const ch = content[i]
+      if (inString) {
+        if (escaped) escaped = false
+        else if (ch === '\\') escaped = true
+        else if (ch === '"') inString = false
+        continue
+      }
+      if (ch === '"') { inString = true; continue }
+      if (ch === '{') depth++
+      else if (ch === '}') {
+        depth--
+        if (depth === 0) {
+          const match = content.slice(start, i + 1)
+          return { json: this.tryStructuredJSONParse(match), before: content.slice(0, start), after: content.slice(i + 1) }
+        }
+      }
+    }
+    return null
   }
 
   // Picks the narrative payload out of a successfully parsed object: prefers
@@ -664,11 +717,67 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
       const value = parsed[key]
       if (typeof value === 'string' && value.trim()) return value.trim()
     }
+    // Excludes title-ish keys and requires real prose length before the
+    // longest-string fallback fires: when the model writes the actual
+    // narration as bare prose outside the JSON object entirely (rather than
+    // under any key), the naive first-to-last-brace parse in
+    // tryStructuredJSONParse can end up with an object holding only
+    // {"title": "..."} -- and without this guard, the fallback below would
+    // then treat that title as the longest (only) string and return it as
+    // the narrative. extractNarrative's embedded-JSON recovery step handles
+    // that case correctly instead, but only if this returns '' first.
     let longest = ''
-    for (const value of Object.values(parsed)) {
+    for (const [key, value] of Object.entries(parsed)) {
+      if (LMStudioProvider.TITLE_KEYS.includes(key.toLowerCase())) continue
       if (typeof value === 'string' && value.trim().length > longest.length) longest = value.trim()
     }
-    return longest
+    return longest.length >= 100 ? longest : ''
+  }
+
+  // The chronicle title is optional best-effort dressing, not the load-
+  // bearing field extractNarrative already secured -- so this returns '' on
+  // any failure instead of throwing, and the caller (StorySystem) falls back
+  // to the moment's plain context label rather than losing the whole moment
+  // over a missing headline.
+  private static readonly TITLE_KEYS = ['title', 'headline', 'chronicleTitle', 'name']
+
+  private extractTitle(content: string): string {
+    const stripped = content.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+    const structured = this.tryStructuredJSONParse(stripped)
+    if (structured) {
+      const value = this.pickTitleField(structured)
+      if (value) return this.cleanTitle(value)
+    }
+    const keyPattern = new RegExp(`"(?:${LMStudioProvider.TITLE_KEYS.join('|')})"\\s*:\\s*"`, 'i')
+    const keyMatch = stripped.match(keyPattern)
+    if (keyMatch && keyMatch.index !== undefined) {
+      const value = this.readJSONStringValue(stripped, keyMatch.index + keyMatch[0].length)
+      if (value) return this.cleanTitle(value)
+    }
+    // Mirrors the embedded-object recovery in extractNarrative: covers the
+    // case where the title JSON object isn't the whole response (e.g. bare
+    // prose comes first, then a trailing {"title": "..."}).
+    const embedded = this.extractFirstJSONObject(stripped)
+    if (embedded?.json) {
+      const value = this.pickTitleField(embedded.json)
+      if (value) return this.cleanTitle(value)
+    }
+    return ''
+  }
+
+  // Unlike pickNarrativeField, this deliberately has no "longest string"
+  // fallback: the narrative field is itself a long string, and without a
+  // known key match this would just steal it back as the title.
+  private pickTitleField(parsed: Record<string, unknown>): string {
+    for (const key of LMStudioProvider.TITLE_KEYS) {
+      const value = parsed[key]
+      if (typeof value === 'string' && value.trim()) return value.trim()
+    }
+    return ''
+  }
+
+  private cleanTitle(value: string): string {
+    return value.trim().replace(/^["']+|["']+$/g, '').replace(/[.\s]+$/, '').slice(0, 80).trim()
   }
 
   // Reads a JSON string value starting right after its opening quote,

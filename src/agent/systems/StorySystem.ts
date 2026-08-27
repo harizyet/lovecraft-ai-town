@@ -60,6 +60,7 @@ export class StorySystem {
       id: `story_${Date.now()}_${++this.state.storyMomentCounter}`,
       kind,
       title,
+      headline: '',
       narrative: '',
       status: 'pending',
       createdAtMinute: this.deps.getAbsoluteMinute(),
@@ -264,15 +265,20 @@ export class StorySystem {
     if (gotSlot) this.deps.setLLMRequestInFlight(true)
     try {
       const prompt = this.deps.promptBuilder.buildKeyMomentNarrationPrompt(moment.kind, facts)
-      moment.narrative = await this.deps.runLLMRequestWithRetry(
+      const result = await this.deps.runLLMRequestWithRetry(
         agentId,
         'story moment narration',
         () => this.deps.aiProvider!.narrateKeyMoment(prompt),
         4
       )
+      moment.narrative = result.narrative
+      // Falls back to the plain context label when the model omits a title:
+      // the narration itself is the load-bearing part of the moment, so a
+      // missing headline shouldn't fail the whole thing.
+      moment.headline = result.title || moment.title
       moment.status = 'ready'
       const preview = moment.narrative.length > 120 ? `${moment.narrative.slice(0, 120)}...` : moment.narrative
-      this.logStoryMomentEvent(moment, agentId, 'ready', `Story moment narrated: ${moment.kind} (${moment.title}) -- "${preview}"`)
+      this.logStoryMomentEvent(moment, agentId, 'ready', `Story moment narrated: ${moment.kind} (${moment.title}) -- headline "${moment.headline}" -- "${preview}"`)
     } catch (error) {
       if (!this.deps.isAgentRefreshCancellation(error)) {
         console.warn('[AgentManager] Story moment narration failed.', error)

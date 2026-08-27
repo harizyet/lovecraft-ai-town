@@ -72,76 +72,23 @@ export class StoryNarrationPanel {
 
     const title = this.container.querySelector<HTMLElement>('#story-panel-title')
     const subtitle = this.container.querySelector<HTMLElement>('#story-panel-subtitle')
-    if (title) title.textContent = this.titleFor(moment)
+    // headline is the LLM-generated, Lovecraft-inspired title for this
+    // specific moment; title is the short code-supplied context label (e.g.
+    // a cult or relic name) -- kept as the subtitle so a moment's origin
+    // stays traceable for debugging even though the display title is prose.
+    if (title) title.textContent = moment.headline || 'From the Village Chronicle'
     if (subtitle) subtitle.textContent = moment.title
-    this.content.innerHTML = `<div style="text-indent:1.4em;">${this.escapeHtml(moment.narrative)}</div>`
+    this.content.innerHTML = this.renderParagraphs(moment.narrative)
     this.container.style.display = 'flex'
   }
 
-  private titleFor(moment: StoryMoment): string {
-    switch (moment.kind) {
-      case 'cult_formed':
-        return 'A New Congregation Rises'
-      case 'prophet_appointed':
-        return 'A Prophet Is Born'
-      case 'demon_created':
-        return 'A Rite Unspeakable'
-      case 'priest_corrupted':
-        return 'A Shepherd Turns'
-      case 'cult_leader_corrupted':
-        return 'A Trusted Face Turns'
-      case 'church_corrupted':
-        return 'The Congregation Reborn'
-      case 'flock_corrupted':
-        return 'The Whole Flock, Unknowing'
-      case 'first_cultist_recruited':
-        return 'The First Convert'
-      case 'believer_poached':
-        return 'A Faith Renounced'
-      case 'deity_ability_first_used':
-        return this.deityAbilityTitleFor(moment.title.toLowerCase())
-      case 'deity_relic_created':
-        return 'A Relic Not Made By Human Hands'
-      case 'alderman_named':
-        return 'The Office of Alderman'
-      case 'knight_called':
-        return 'A Knight Rides In'
-      case 'inquisitor_called':
-        return 'The Inquisitor Arrives'
-      case 'knight_killed':
-        return 'The Knight Falls'
-      case 'inquisitor_killed':
-        return 'The Inquisitor Falls'
-      case 'only_cultists_survive':
-        return 'The Village That Remains'
-      case 'cult_leader_sole_survivor':
-        return 'Alone With The Faith'
-      case 'cults_extinguished':
-        return 'The Last Cult Falls'
-      default:
-        return 'From the Village Chronicle'
-    }
-  }
-
-  private deityAbilityTitleFor(ability: string): string {
-    switch (ability) {
-      case 'bless':
-        return 'The First Blessing'
-      case 'heal':
-        return 'The First Healing'
-      case 'smite':
-        return 'The First Smiting'
-      case 'resurrect':
-        return 'The First Resurrection'
-      case 'manifest':
-        return 'The First Manifestation'
-      case 'weather':
-        return 'The Sky Obeys'
-      case 'converse':
-        return 'A Voice From Beyond'
-      default:
-        return 'A Divine First'
-    }
+  private renderParagraphs(narrative: string): string {
+    return narrative
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean)
+      .map((paragraph) => `<div style="text-indent:1.4em;margin-top:8px;">${this.escapeHtml(paragraph)}</div>`)
+      .join('')
   }
 
   private loadAcknowledgements(): Set<string> {
