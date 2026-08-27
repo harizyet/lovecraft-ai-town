@@ -25,6 +25,9 @@ const KEY_MOMENT_LABELS: Record<StoryMomentKind, string> = {
   inquisitor_called: "an Inquisitor arriving at a Priest's own summons, called in after that Priest quietly confirmed heresy taking root among the flock -- write this as the moment the church itself admits it cannot police its own congregation and reaches for a colder, more absolute kind of justice from outside",
   knight_killed: "the Knight who came from beyond the village's walls to stand against its worst violence, now struck down themselves -- write this as the fall of the outside world's answer to the village's danger, a protector proven mortal after all, and the villagers left once again with no one but themselves to rely on",
   inquisitor_killed: "the Inquisitor, called in to root out hidden heresy, now silenced before finishing the work that brought them here -- write this as the death of an outside authority sent to judge the village, and the unsettling question of who, if anyone, still stands between the village and what it has been hiding",
+  only_cultists_survive: "the village's last ordinary, unconverted souls all gone -- to death, exile, or worse -- leaving only the cult's own faithful still breathing within its bounds; write this as the moment the village and the cult become, quietly and irreversibly, the same thing, with no unconverted witness left to mourn what the place used to be",
+  cult_leader_sole_survivor: "the final reckoning of that same slow conquest -- every other soul in the village now gone, and only the cult's leader left standing alone amid it, sole survivor and sole believer of a faith that has, in the end, no one left to preach to; write this as the eerie, hollow triumph of a prophet who has finally won everything and is left with no one",
+  cults_extinguished: "the opposite turn of fortune -- every cult that ever rose in this village, and every leader who ever led one, now gone, whether to the noose, the blade, exile, or plain abandonment, leaving no altar still tended and no congregation still whispering in secret; write this as the village's quiet exhale after a long-running darkness finally guttering out, with room for both relief and the faint, uneasy sense that something is now missing",
 }
 
 export class PromptBuilder {
@@ -34,7 +37,7 @@ export class PromptBuilder {
 
 Facts: ${facts}
 
-Write the chronicle's narration of this moment.`
+Write the chronicle's narration of this moment. Set the scene using only the place and occupation stated in the facts above -- do not relocate it to a church or shrine unless the facts themselves say so.`
   }
 
   public buildDailyPropheticClaimPrompt(agent: Agent, allAgents: Agent[], day: number): string {

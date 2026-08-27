@@ -1326,7 +1326,7 @@ export class ReligionSystem {
       agent.state.name,
       isFoundingPriest
         ? `${agent.state.name}, the village's own Priest and founder of The Church of Christ, secretly submitted to a whispered demand from ${deityName} -- "${rumour.text}" -- and accepted whatever forbidden truth it promised in return. To their congregation nothing appears to change; in private they now serve a far older and hungrier truth.`
-        : `${agent.state.name}, an ordinary villager formerly working as a ${formerJob ?? 'commoner'}, knelt and submitted to ${deityName}'s whispered demand -- "${rumour.text}" -- and became the village's Prophet, carrying whatever truth was bestowed on them in exchange.`,
+        : `${agent.state.name}, a ${formerJob ?? 'commoner'} with no tie to any church or clergy, was at their ordinary work as a ${formerJob ?? 'commoner'} when they knelt where they stood and submitted to ${deityName}'s whispered demand -- "${rumour.text}" -- and became the village's Prophet, carrying whatever truth was bestowed on them in exchange. Set this scene at their trade, not inside any church.`,
       agent.state.id,
       event.id
     )

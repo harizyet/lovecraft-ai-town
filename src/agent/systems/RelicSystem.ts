@@ -165,8 +165,13 @@ export class RelicSystem {
         }
         agent.state.forbiddenKnowledge = [...(agent.state.forbiddenKnowledge ?? []), entry]
 
-        // High chance (80%) of going insane
-        if (Math.random() < 0.8) {
+        // A cultist's conviction protects them from being shattered by a
+        // revelation, even one belonging to a rival deity -- consistent with
+        // the same exemption applied to forbidden-knowledge rumours.
+        const isCultist = agent.state.secretProphet || agent.state.cult != null
+
+        // High chance (80%) of going insane, unless shielded by cult conviction
+        if (!isCultist && Math.random() < 0.8) {
           const reaction: ExistentialReactionResult = {
             comprehended: true,
             reaction: 'madness',

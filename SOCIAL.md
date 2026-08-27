@@ -48,6 +48,8 @@ Villagers may:
 
 Witnesses within observation range receive memories of violence, theft, death, help, and destruction. Significant harmful events can seed natural rumours. Death removes the victim from active life while leaving a body in the world, and witnesses can spread news of the death.
 
+A villager whose health falls below 50 is compelled toward recovery: once their sleep and hunger needs are already satisfied, and they are not mid-sleep, mid-flee, or mid-attack, they head to the apothecary and work there for treatment. This compulsion latches on below the threshold and holds until health is fully restored, rather than releasing the instant health ticks back above 50. Only permanently insane villagers are excluded, matching how they are already excluded from the ordinary nightly sleep schedule.
+
 Attacks are explicit recorded events classified as `violent_incident`, including the attacker, victim, damage, resulting health, survival, causation, and witnesses. Every attack creates a distinct event-backed belief, even when the same attacker strikes the same victim repeatedly in one day. The victim forms this belief from direct personal experience with believer stance and full confidence; they do not receive it as hearsay from their attacker. The natural-rumour representation retains the attack event as its evidence source.
 
 Every agent-on-agent attack has a 10% chance to become an immediate lethal strike. A lethal strike deals the target's remaining health as damage and otherwise follows the normal death, witness, memory, relationship, and rumour flow.
@@ -107,7 +109,10 @@ may choose `call_inquisitor`. This creates one Inquisitor at the town edge and
 routes them toward the church. The Inquisitor receives the calling Priest's
 confirmed cult evidence and can continue cult investigations and
 interrogations. Each outsider arrival is logged and announced as an arrival;
-the one-time arrival flags and outsider identity persist in saved games.
+the one-time arrival flags and outsider identity persist in saved games. Each
+arrival now also fires its own Story Narration moment (`knight_called` /
+`inquisitor_called`), and an outsider's death in combat fires a matching
+`knight_killed` / `inquisitor_killed` moment.
 
 Cultists detect nearby priests and replace preaching, recruitment, prayer,
 interrogation, and visible rites with an innocuous activity. The completion
@@ -169,6 +174,13 @@ divine smiting, court execution, and ordinary attacks—unless the attacker is a
 persisted Knight or Inquisitor outsider. Blocked attacks are logged with zero
 damage and an invulnerability outcome. Demon charges, created Demons, their
 last commands, and ongoing commanded movement persist in saved games.
+
+The instant a Demon is successfully summoned, the entire map's environmental
+corruption is slammed to maximum (1.0) rather than only spreading outward
+from the summoning site over time — the manifestation's shock reads as
+total and immediate. Tiles outside the Demon's own radius of influence still
+decay back down afterward through the ordinary corruption mechanics once
+nothing else sustains them there.
 
 Living agents within eight tiles see the Demon manifest. Witnesses who belong
 to any cult are immune to the manifestation's existential reaction. Every
@@ -277,11 +289,15 @@ resolves as a binary insane/not-insane roll. It resolves in two stages:
      Later reality-breaking moments reinforce the condition; ordinary
      emotional changes, saving, loading, and resurrection cannot cure it.
 
-A cult leader (secret or open) is exempt from sanity damage entirely --
-their conviction holds regardless of what they're told. A secret prophet's
-sanity damage stays hidden behind their calm public face rather than forcing
-a visible panic. Every reaction is recorded as a private witness event and
-memory.
+Any cultist -- a secret prophet, a leader, or an ordinary rank-and-file
+member -- is exempt from sanity damage entirely: their conviction in a hidden
+truth is unlikely to break someone who has already organized their life
+around it. A secret prophet's sanity damage stays hidden behind their calm
+public face rather than forcing a visible panic. Every reaction is recorded
+as a private witness event and memory. This exemption originally covered
+only cult leaders; it now extends to every cultist, and to the equivalent
+80%-insanity roll a deity-placed forbidden relic poses to an unbelieving
+discoverer (see Forbidden Relics below).
 - Passing information later supported by investigation: a small gain.
 - Passing information later found unsupported: a larger loss.
 
@@ -389,6 +405,8 @@ Cult members act as a coordinated voting bloc in resolution court. When the livi
 Cults are non-aggressive toward outsiders by default and have no fixed hostility assigned at founding. Their collective temperament emerges from the average aggression of their living membership. A cult with at least two members and average aggression of 65% or higher periodically has a bounded chance to form a mob; at least two members with 45% aggression must participate. The mob may select a living nonbeliever or atheist outside the cult, pursue them together, and attack on arrival. Mob formation, membership, target, group aggression, and causation are recorded, and each cult has a six-simulated-hour cooldown between mobs.
 
 Cult membership unlocks cult-specific tasks: `pray`, `conjure`, `resurrect`, `heal`, `bless`, `curse`, `ritual`, and `preach`; `summon` and `build_shrine` are reserved for the cult leader. Personality, doctrine, faith, memories, and circumstances determine whether these appear in an LLM decision or daily schedule. Non-members cannot execute them; invalid non-member rites are replaced by ordinary work. Prayer and ritual strengthen faith, healing restores health, blessing improves confidence and reputation, curses frighten and reduce reputation, preaching improves the speaker's standing, and resurrection can restore a specifically named dead villager with partial health and forces that villager to reevaluate their life. A leader's summoning names a building, gathers two fellow members there, and waits for all three participants before producing a Demon charge tied to that location. Conjuring creates a witnessed manifestation event. Direct supernatural effects therefore enter the simulation only as consequences of cult actions rather than arbitrary actions by ordinary villagers.
+
+Preaching now actively seeks converts rather than only sermonizing from the shrine: a preaching cult member first looks for the nearest living, convertible, non-immune villager, and if one exists beyond speaking range, travels toward them before beginning the sermon. With no eligible convert nearby, preaching falls back to gathering at the shrine as before.
 
 ### A corrupted Priest
 
@@ -512,6 +530,8 @@ Related unresolved accusations naming the same defendant are grouped into the ca
 
 Execution is deliberately presented to the LLM as irreversible and appropriate only for exceptionally grave, credible threats. Both LLM and fallback votes are required to remain consistent with personal stance. Fallback believers vote for exile even when their believed claim is still unverified; aggressive, highly confident believers may vote for execution only when a grave claim is verified. Deniers and villagers with no believed claim vote to absolve.
 
+This consistency check now also applies uniformly after any non-cultist voter's LLM vote, not only the deterministic fallback. A voter who does not actually hold a believer stance on any claim in the case is forced to `absolve` regardless of what they voted. A voter who chose `execute` is downgraded to `exile` unless they believe a genuinely court-eligible claim with at least 85% confidence -- an execute vote otherwise reads as firmer conviction than the voter actually holds. Cult members are unaffected by this check; they continue to follow their bloc's directed vote instead.
+
 ## Social interfaces
 
 - **Rumour & Belief Tracker**: shows claims, origins, credibility, reach, related branches, objective whisper truth controls, agent judgments, individual belief badges, and private thought events.
@@ -562,6 +582,10 @@ the same time; each preempts the other from starting.
 4. If passed, every living villager working the proposal's target job gains
    wealth (for example, a passed "grow more crops" proposal raises every
    living Farmer's wealth). A rejected proposal has no mechanical effect.
+   Every wealth policy spends the village's own funds, so the Gentry camp
+   leans against supporting one by default regardless of which trade
+   benefits; a Gentry voter's remaining path to support is direct
+   self-interest, when the proposal targets their own trade.
 
 The **Village Assembly** panel shows the live question, gathering/voting
 status, each villager's statement and vote, and the final outcome, mirroring
@@ -626,6 +650,10 @@ their own cult still applies to the Alderman's vote, so an Alderman can never
 personally condemn a fellow cultist to execution — only exile. The office
 ends only if the Alderman dies or is removed from the village; it is not
 automatically inherited by a cult successor.
+
+A successful, unanimous election is chronicled as its own Story Narration
+moment (`alderman_named`) — a village assembly unknowingly handing binding
+authority to one of its own hidden cult leaders.
 
 ## Configuration affecting social dynamics
 
@@ -726,6 +754,7 @@ Forbidden Relics can be generated in two ways:
    - The user inputs custom revelation text and specifies an associated deity.
    - The simulation enters a map placement mode where the player clicks a grid tile to place the relic.
    - Deity relics have a fixed severity of 90, are marked as containing forbidden knowledge, and are authored by `'deity'` (Divine Manifestation).
+   - Creation is chronicled through its own `deity_relic_created` Story Narration moment, distinct from `forbidden_relic_created` (which is reserved for a mortal investigator's own written findings).
 
 ### Discovery and Interaction
 
@@ -734,6 +763,15 @@ Forbidden Relics can be generated in two ways:
 * **Target Filter**: An agent is only affected if they are not the relic's author and they are either not in the relic's cult, or they belong to an opposed group.
 * **One-time Read**: Each agent can only discover and read a specific relic once (`discoveredByAgentIds`).
 * **Consequences**:
-  - **Deity Relics**: If the discovering agent already believes in the associated deity (confidence >= 50%), they are unaffected. Otherwise, they acquire the text as forbidden knowledge and face an immediate **80% chance of permanent insanity** (`'madness'` reaction). If they pass the 80% sanity check, they resolve the knowledge via normal existential-witness reactions.
+  - **Deity Relics**: If the discovering agent already believes in the associated deity (confidence >= 50%), they are unaffected. Otherwise, they acquire the text as forbidden knowledge and face an immediate **80% chance of permanent insanity** (`'madness'` reaction) -- unless they are a cultist (secret prophet, leader, or ordinary member), whose conviction shields them from the roll entirely, the same exemption applied to forbidden-knowledge rumours. If they pass the 80% sanity check (or are shielded), they resolve the knowledge via normal existential-witness reactions.
   - **Organic Relics with Forbidden Knowledge**: The agent undergoes a standard existential-witness reaction check.
   - **Cult Alignment**: If the relic is cult-tagged, the agent has a personality-weighted chance (scaled by curiosity and caution) to willingly join the associated cult. Specifically, the base chance is 35% if the relic is forbidden (20% if not), boosted by `curiosity * 0.25` and penalized by `caution * 0.2`. If they pass, they trigger `maybeTriggerWillingCultJoin` toward the deity.
+
+## Village endings
+
+Two long-run outcomes are checked every tick against the current set of living villagers, each narrated only once per game:
+
+- **The Village That Remains**: every living villager currently belongs to a cult, with no unconverted soul left in the village. If the sole survivor happens to be that cult's own leader or founder, the moment narrates instead as that leader's hollow, solitary triumph ("Alone With The Faith") rather than the more general village-wide beat.
+- **The Last Cult Falls**: after at least one cult has existed at some point in the game, every cult (and every leader who ever led one) is gone — to death, exile, or plain abandonment — leaving no altar tended and no congregation left anywhere in the village. This never fires for a fresh village that never had a cult in the first place.
+
+Both checks re-derive the village's current composition from the living-agent list rather than hooking into any specific death, exile, or defection event, since a villager can stop being alive or stop belonging to a cult through many different paths.

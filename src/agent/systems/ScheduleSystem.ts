@@ -22,6 +22,7 @@ export interface ScheduleState {
   activeBlocks: Map<string, ActiveBlockEntry>
   pendingActivityLabels: Map<string, string>
   idleSinceMinute: Map<string, number>
+  recoveringHealthAgentIds: Set<string>
 }
 
 export function createScheduleState(): ScheduleState {
@@ -31,6 +32,7 @@ export function createScheduleState(): ScheduleState {
     activeBlocks: new Map(),
     pendingActivityLabels: new Map(),
     idleSinceMinute: new Map(),
+    recoveringHealthAgentIds: new Set(),
   }
 }
 
@@ -527,7 +529,12 @@ export class ScheduleSystem {
   }
 
   enforceExhaustionSleep(): void {
-    for (const agent of this.deps.getAgents().filter((candidate) => candidate.state.alive && !candidate.state.demon && !candidate.isInsane())) {
+    // Insane agents are deliberately excluded from the *normal* nightly
+    // schedule (enforceNightSleep / ensureNightSleepBlock) so their behavior
+    // reads as erratic, but this is the last-resort collapse safety net --
+    // excluding them here as well left insanity a guaranteed, irreversible
+    // death sentence via unrecoverable exhaustion.
+    for (const agent of this.deps.getAgents().filter((candidate) => candidate.state.alive && !candidate.state.demon)) {
       if (agent.state.needs.energy > 0) continue
       if (this.state.activeBlocks.get(agent.state.id)?.action.action === 'sleep') continue
 
@@ -574,6 +581,55 @@ export class ScheduleSystem {
         dialogue: '',
         emotionalState: 'tired',
         durationMinutes: 120,
+      })
+    }
+  }
+
+  // A wound below 50 HP latches the agent into recovery mode until they're
+  // back to full health, rather than dropping the urge the instant they tick
+  // back over the 50 threshold -- otherwise they'd stall out hovering just
+  // above it. Permanently insane agents are excluded for the same reason
+  // enforceNightSleep excludes the insane: their behavior is deliberately
+  // erratic and shouldn't be steered by a health-seeking routine. An agent
+  // mid-sleep, mid-flee, or mid-attack is left alone; the seek-healing
+  // override only fires once their immediate needs and safety are settled.
+  enforceLowHealthRecovery(): void {
+    for (const agent of this.deps.getAgents().filter((candidate) =>
+      candidate.state.alive && !candidate.state.demon && !candidate.state.permanentInsanity
+    )) {
+      if (agent.state.health < 50) {
+        this.state.recoveringHealthAgentIds.add(agent.state.id)
+      } else if (agent.state.health >= agent.state.maxHealth) {
+        this.state.recoveringHealthAgentIds.delete(agent.state.id)
+      }
+      if (!this.state.recoveringHealthAgentIds.has(agent.state.id)) continue
+
+      const active = this.state.activeBlocks.get(agent.state.id)
+      if (active && ['sleep', 'flee', 'attack'].includes(active.action.action)) continue
+      // Sleep and food take priority over a trip to the apothecary; once
+      // those needs are satisfied this re-fires on a later tick and sends
+      // them to heal.
+      if (agent.state.needs.energy < 90 || agent.state.needs.hunger > 40) continue
+
+      const apothecary = this.deps.findBuildingOfType(agent, 'apothecary')
+      if (!apothecary) continue
+      if (active?.action.action === 'work' && active.action.target === apothecary.name) continue
+
+      const partnerId = agent.getConversationPartnerId()
+      const partner = partnerId
+        ? this.deps.getAgents().find((candidate) => candidate.state.id === partnerId)
+        : undefined
+      if (partner) this.deps.conversationManager.closeConversation(agent, partner)
+      else agent.closeActiveConversation()
+
+      this.state.activeBlocks.delete(agent.state.id)
+      this.startBlock(agent, {
+        action: 'work',
+        target: apothecary.name,
+        reasoning: `Health critically low (${Math.round(agent.state.health)}/${agent.state.maxHealth} HP); seeking treatment at ${apothecary.name}`,
+        dialogue: '',
+        emotionalState: 'tired',
+        durationMinutes: 30,
       })
     }
   }

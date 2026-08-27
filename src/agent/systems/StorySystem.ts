@@ -8,6 +8,10 @@ export interface StoryState {
   firstCultRecruitNarratedCultIds: Set<string>
   firstBelieverPoachedNarratedCultIds: Set<string>
   firstDeityAbilityNarratedKinds: Set<string>
+  onlyCultistsSurviveNarrated: boolean
+  cultLeaderSoleSurvivorNarrated: boolean
+  cultsHaveExistedInGame: boolean
+  cultsExtinguishedNarrated: boolean
   pendingStoryMomentNarrations: number
   storyMomentNarrationChain: Promise<void>
 }
@@ -19,6 +23,10 @@ export function createStoryState(): StoryState {
     firstCultRecruitNarratedCultIds: new Set(),
     firstBelieverPoachedNarratedCultIds: new Set(),
     firstDeityAbilityNarratedKinds: new Set(),
+    onlyCultistsSurviveNarrated: false,
+    cultLeaderSoleSurvivorNarrated: false,
+    cultsHaveExistedInGame: false,
+    cultsExtinguishedNarrated: false,
     pendingStoryMomentNarrations: 0,
     storyMomentNarrationChain: Promise.resolve(),
   }
@@ -133,6 +141,84 @@ export class StorySystem {
     this.state.firstDeityAbilityNarratedKinds.add(ability)
     const label = ability.charAt(0).toUpperCase() + ability.slice(1)
     this.queueStoryMoment('deity_ability_first_used', label, facts, agentId, sourceEventId)
+  }
+
+  // Checked every tick rather than off a single death/exile event: an
+  // agent can stop being alive through many separate paths (combat,
+  // starvation, suicide, execution, exile, sacrifice), and re-deriving the
+  // village's current survivor composition here is simpler and more
+  // reliable than threading this check through every one of those sites.
+  // Each of the two beats below narrates only once per game, same as the
+  // other "first time" story moments.
+  public checkSurvivorComposition(agents: Agent[]): void {
+    if (this.state.onlyCultistsSurviveNarrated && this.state.cultLeaderSoleSurvivorNarrated) return
+    const living = agents.filter((agent) => agent.state.alive)
+    if (living.length === 0) return
+    if (!living.every((agent) => !!agent.state.cult)) return
+
+    if (living.length === 1) {
+      const survivor = living[0]
+      const role = survivor.state.cult?.role
+      if (role === 'leader' || role === 'founder') {
+        this.queueCultLeaderSoleSurvivorMoment(survivor)
+        return
+      }
+    }
+    this.queueOnlyCultistsSurviveMoment(living)
+  }
+
+  // Narrates only once: the moment every remaining villager belongs to a
+  // cult, with no unconverted soul left alive to notice.
+  private queueOnlyCultistsSurviveMoment(survivors: Agent[]): void {
+    if (this.state.onlyCultistsSurviveNarrated) return
+    this.state.onlyCultistsSurviveNarrated = true
+    const names = survivors.map((agent) => agent.state.name).join(', ')
+    this.queueStoryMoment(
+      'only_cultists_survive',
+      'The Village That Remains',
+      `Every villager still alive is now a member of a cult -- the survivors are: ${names}. No unconverted soul remains in the village.`,
+      survivors[0].state.id,
+      ''
+    )
+  }
+
+  // Narrates only once: the cult's leader left as the very last living
+  // soul in the village.
+  private queueCultLeaderSoleSurvivorMoment(survivor: Agent): void {
+    if (this.state.cultLeaderSoleSurvivorNarrated) return
+    this.state.cultLeaderSoleSurvivorNarrated = true
+    const cultName = survivor.state.cult?.name ?? 'their cult'
+    this.queueStoryMoment(
+      'cult_leader_sole_survivor',
+      cultName,
+      `${survivor.state.name}, leader of "${cultName}", is now the only living soul left in the village. Every other villager is dead, exiled, or otherwise gone.`,
+      survivor.state.id,
+      ''
+    )
+  }
+
+  // Checked every tick, same as checkSurvivorComposition: cult membership
+  // (and its clean-up on the last member's death/exile) happens across many
+  // scattered sites, so re-deriving "does any cult still exist" here is
+  // simpler than threading a call through each of them. Only fires once a
+  // cult has actually existed in this game, so a fresh village with no
+  // cults yet doesn't immediately narrate its own absence.
+  public checkCultExtinction(agents: Agent[]): void {
+    if (this.state.cultsExtinguishedNarrated) return
+    const anyCultExists = agents.some((agent) => !!agent.state.cult)
+    if (anyCultExists) {
+      this.state.cultsHaveExistedInGame = true
+      return
+    }
+    if (!this.state.cultsHaveExistedInGame) return
+    this.state.cultsExtinguishedNarrated = true
+    this.queueStoryMoment(
+      'cults_extinguished',
+      'The Last Cult Falls',
+      'Every cult that ever rose in the village -- and every leader who ever led one -- is now gone. No cult and no cult leader remains anywhere in the village.',
+      agents[0]?.state.id ?? 'world',
+      ''
+    )
   }
 
   // Waits for the shared LLM request slot to free up rather than giving up

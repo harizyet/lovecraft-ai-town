@@ -3,7 +3,7 @@
 ## Overview
 A 2D simulated town where LLM-powered AI agents live, interact, make decisions, and cause real-world consequences. Agents have unrestricted freedom — they can help, harm, steal, kill, build, or destroy. All actions are logged with full causation chains.
 
-**Status**: All planned features and major extensions fully implemented (~21,200 lines of TypeScript, 38 source files, zero runtime dependencies).
+**Status**: All planned features and major extensions fully implemented (~22,800 lines of TypeScript, 39 source files, zero runtime dependencies).
 
 ## Tech Stack
 - **TypeScript 6.0 + Vite 8** — ES modules, fast dev iteration
@@ -20,37 +20,38 @@ A 2D simulated town where LLM-powered AI agents live, interact, make decisions, 
 ai-town/
 ├── src/
 │   ├── types/
-│   │   └── [index.ts](file:///home/hariz/village/ai-town/src/types/index.ts)                   # Shared TypeScript interfaces & types (695 lines)
+│   │   └── [index.ts](file:///home/hariz/village/ai-town/src/types/index.ts)                   # Shared TypeScript interfaces & types (755 lines)
 │   ├── world/
 │   │   └── [World.ts](file:///home/hariz/village/ai-town/src/world/World.ts)                   # Grid generation, buildings & clearance logic (459 lines)
 │   ├── agent/
 │   │   ├── [Agent.ts](file:///home/hariz/village/ai-town/src/agent/Agent.ts)                   # Individual agent parameters, needs, traits, memory (754 lines)
-│   │   ├── [AgentManager.ts](file:///home/hariz/village/ai-town/src/agent/AgentManager.ts)            # Thin orchestrator: wiring, main loop, snapshot save/restore (1223 lines)
-│   │   └── systems/                   # Extracted modular subsystems (10 systems + shared DI interface)
-│   │       ├── [RumourSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/RumourSystem.ts)        # Propagation, credibility, corroboration, investigation (2122 lines)
-│   │       ├── [CultSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/CultSystem.ts)          # Shrines, demonic summoning, cult mechanics (2109 lines)
-│   │       ├── [ReligionSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/ReligionSystem.ts)      # Faith, prophets, revelations, deity chat (1749 lines)
-│   │       ├── [JusticeSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/JusticeSystem.ts)       # Resolution courts, trials, voting, verdicts (936 lines)
-│   │       ├── [PoliticalSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/PoliticalSystem.ts)     # Gentry/Commons camps, town policy voting, Alderman, bribery (879 lines)
-│   │       ├── [DecisionEngine.ts](file:///home/hariz/village/ai-town/src/agent/systems/DecisionEngine.ts)      # LLM decision queue & the action dispatcher (875 lines)
-│   │       ├── [ScheduleSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/ScheduleSystem.ts)      # Daily plans, activity blocks, idle/weather/exhaustion handling (738 lines)
+│   │   ├── [AgentManager.ts](file:///home/hariz/village/ai-town/src/agent/AgentManager.ts)            # Thin orchestrator: wiring, main loop, snapshot save/restore (1319 lines)
+│   │   └── systems/                   # Extracted modular subsystems (12 systems + shared DI interface)
+│   │       ├── [RumourSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/RumourSystem.ts)        # Propagation, credibility, corroboration, investigation (2124 lines)
+│   │       ├── [CultSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/CultSystem.ts)          # Shrines, demonic summoning, cult mechanics, targeted preaching (2145 lines)
+│   │       ├── [ReligionSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/ReligionSystem.ts)      # Faith, prophets, revelations, deity chat (1834 lines)
+│   │       ├── [JusticeSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/JusticeSystem.ts)       # Resolution courts, trials, voting, belief-consistent verdicts (975 lines)
+│   │       ├── [PoliticalSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/PoliticalSystem.ts)     # Gentry/Commons camps, town policy voting, Alderman, bribery (899 lines)
+│   │       ├── [DecisionEngine.ts](file:///home/hariz/village/ai-town/src/agent/systems/DecisionEngine.ts)      # LLM decision queue & the action dispatcher (887 lines)
+│   │       ├── [ScheduleSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/ScheduleSystem.ts)      # Daily plans, activity blocks, idle/weather/exhaustion/health-recovery handling (917 lines)
 │   │       ├── [SocialSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/SocialSystem.ts)        # Encounters, conversation batching & context (430 lines)
-│   │       ├── [OutsiderSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/OutsiderSystem.ts)      # Knight/Inquisitor spawning & combat (263 lines)
-│   │       ├── [StorySystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/StorySystem.ts)         # Narrates major story moments & events (201 lines)
-│   │       ├── [EnvironmentSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/EnvironmentSystem.ts)   # Localized tile corruption from cult shrines, demons & rituals
-│   │       └── [SystemDeps.ts](file:///home/hariz/village/ai-town/src/agent/systems/SystemDeps.ts)          # Shared dependency-injection interface between systems (260 lines)
+│   │       ├── [OutsiderSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/OutsiderSystem.ts)      # Knight/Inquisitor spawning & combat (270 lines)
+│   │       ├── [StorySystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/StorySystem.ts)         # Narrates major story moments & events, incl. survivor/extinction beats (287 lines)
+│   │       ├── [EnvironmentSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/EnvironmentSystem.ts)   # Localized tile corruption from cult shrines, demons & rituals; map-wide demon saturation
+│   │       ├── [RelicSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/RelicSystem.ts)         # Forbidden relic creation, discovery & deity relic placement
+│   │       └── [SystemDeps.ts](file:///home/hariz/village/ai-town/src/agent/systems/SystemDeps.ts)          # Shared dependency-injection interface between systems (280 lines)
 │   ├── ai/
 │   │   ├── [AIProvider.ts](file:///home/hariz/village/ai-town/src/ai/AIProvider.ts)              # OpenAI HTTP client & prompt system (1151 lines)
-│   │   └── [PromptBuilder.ts](file:///home/hariz/village/ai-town/src/ai/PromptBuilder.ts)           # Prompt construction from agent state (482 lines)
+│   │   └── [PromptBuilder.ts](file:///home/hariz/village/ai-town/src/ai/PromptBuilder.ts)           # Prompt construction from agent state (505 lines)
 │   ├── simulation/
 │   │   └── [SimulationManager.ts](file:///home/hariz/village/ai-town/src/simulation/SimulationManager.ts)       # Central game loop, tick updates, weather, day/night (879 lines)
 │   ├── rendering/
 │   │   ├── [Renderer.ts](file:///home/hariz/village/ai-town/src/rendering/Renderer.ts)                # Canvas 2D engine, text tags, overlay filters (502 lines)
 │   │   ├── [Camera.ts](file:///home/hariz/village/ai-town/src/rendering/Camera.ts)                  # Target tracking & interpolation (68 lines)
-│   │   ├── [DebugOverlay.ts](file:///home/hariz/village/ai-town/src/rendering/DebugOverlay.ts)            # Sidebar debug, whispers & JSON/CSV log export (1902 lines)
+│   │   ├── [DebugOverlay.ts](file:///home/hariz/village/ai-town/src/rendering/DebugOverlay.ts)            # Sidebar debug, whispers & JSON/CSV log export (1971 lines)
 │   │   ├── [ConversationPanel.ts](file:///home/hariz/village/ai-town/src/rendering/ConversationPanel.ts)       # Rendering active conversation UI (97 lines)
 │   │   ├── [PolicyPanel.ts](file:///home/hariz/village/ai-town/src/rendering/PolicyPanel.ts)             # Rendering town assemblies & policy voting (146 lines)
-│   │   ├── [StoryNarrationPanel.ts](file:///home/hariz/village/ai-town/src/rendering/StoryNarrationPanel.ts)     # Rendering major town story moments (151 lines)
+│   │   ├── [StoryNarrationPanel.ts](file:///home/hariz/village/ai-town/src/rendering/StoryNarrationPanel.ts)     # Rendering major town story moments (169 lines)
 │   │   ├── [CourtPanel.ts](file:///home/hariz/village/ai-town/src/rendering/CourtPanel.ts)              # Rendering resolution trials (201 lines)
 │   │   └── [DeityChatPanel.ts](file:///home/hariz/village/ai-town/src/rendering/DeityChatPanel.ts)          # Rendering whispers & deity commands (199 lines)
 │   ├── interaction/
@@ -95,15 +96,16 @@ main.ts
                     ├── SocialSystem (Encounters, conversation batching)
                     ├── OutsiderSystem (Knight/Inquisitor spawning & combat)
                     ├── StorySystem (Chronicles major town events, alerts, and narrations)
-                    └── EnvironmentSystem (Localized tile corruption from cult/demon/ritual activity)
+                    ├── EnvironmentSystem (Localized tile corruption from cult/demon/ritual activity)
+                    └── RelicSystem (Forbidden relic creation, discovery & deity relic placement)
 ```
 
 Each system is constructed once by `AgentManager` and receives a `SystemDeps` object (built
 from `AgentManager`'s own fields/bound methods) rather than a back-reference to `AgentManager`
-itself or to sibling systems — this is what keeps the split from just becoming eleven files
+itself or to sibling systems — this is what keeps the split from just becoming a dozen files
 that all still secretly depend on each other's internals. `DecisionEngine`, as the one dispatcher
 that legitimately needs to reach every subsystem, is the sole exception and holds direct typed
-references to the other nine systems.
+references to the other eleven systems.
 
 ---
 
@@ -146,7 +148,13 @@ references to the other nine systems.
 | 31 | **Environmental Decay & Weather Corruption** | `EnvironmentSystem.ts`, `Renderer.ts` | Cult shrines/demons/rituals spread localized, reversible tile corruption: brackish water, blighted crops, persistent fog |
 | 32 | **Eldritch Blight** | `EnvironmentSystem.ts`, `types/index.ts` | Sustained high corruption permanently converts a GRASS/WATER tile's actual `TileType` into `BLIGHTED`/`BRACKISH_WATER` -- a lasting scar that outlives the corrupting source, unlike the reversible tint above |
 | 33 | **Dreamscape (planted & spontaneous nightmares)** | `ReligionSystem.ts`, `ScheduleSystem.ts`, `PromptBuilder.ts` | Deity ability plants a bias/nightmare into a sleeping, cult-unaligned villager's mind; the same villagers can also spontaneously nightmare on their own, odds scaled by town corruption and low sanity. Surfaces in reasoning and conversation, fades on next sleep |
-| 34 | **Create Forbidden Relic deity ability** | `RelicSystem.ts`, `SimulationManager.ts`, `Renderer.ts`, `DebugOverlay.ts` | Deity ability to write and place a custom forbidden relic directly on the map. Unbelievers of the relic's associated deity gain the knowledge but face an 80% chance of immediate permanent insanity. |
+| 34 | **Create Forbidden Relic deity ability** | `RelicSystem.ts`, `SimulationManager.ts`, `Renderer.ts`, `DebugOverlay.ts` | Deity ability to write and place a custom forbidden relic directly on the map. Unbelievers of the relic's associated deity gain the knowledge but face an 80% chance of immediate permanent insanity, unless shielded by cult conviction. |
+| 35 | **Targeted Preaching** | `CultSystem.ts`, `DecisionEngine.ts`, `ScheduleSystem.ts` | A preaching cult member seeks out and travels to the nearest convertible villager instead of only sermonizing from the shrine |
+| 36 | **Belief-Consistent Court Sentencing** | `JusticeSystem.ts` | Non-cultist voters cannot vote to punish an accusation they don't believe, and execution requires firm, high-confidence belief in a genuinely grave claim, otherwise the vote is downgraded to exile |
+| 37 | **Low-Health Recovery** | `ScheduleSystem.ts` | Below 50 HP, an agent is compelled toward the apothecary once sleep/hunger needs are met, latching into recovery mode until fully healed; the exhaustion-sleep safety net no longer excludes insane agents |
+| 38 | **Extended Cult Conviction Immunity** | `RelicSystem.ts`, `RumourSystem.ts` | Sanity-shielding from forbidden-knowledge revelations (rumours and relics alike) now covers every cultist — secret prophets, leaders, and rank-and-file members — not just leadership |
+| 39 | **Alderman Political Fixes & Outsider/Relic Narration** | `PoliticalSystem.ts`, `OutsiderSystem.ts`, `AgentManager.ts`, `RelicSystem.ts`, `EnvironmentSystem.ts`, `StorySystem.ts` | Gentry voters lean against any village-funded policy spend by default; a deity-placed relic now fires its own `deity_relic_created` moment distinct from an organically-written one; Knight/Inquisitor arrivals and deaths, and an Alderman's naming, are chronicled; a successful Demon summon now instantly saturates the whole map's corruption to maximum |
+| 40 | **Survivor Composition & Cult Extinction Story Beats** | `StorySystem.ts`, `AgentManager.ts` | Ticked every update: narrates once when every living villager belongs to a cult, once if a cult leader ends up the sole living survivor, and once when every cult that ever existed in the game has died out |
 
 ### Partially Implemented / Simplified
 
@@ -313,29 +321,36 @@ The event queues an LLM reaction for affected agents
 ### Justice & Trials Subsystem (`JusticeSystem.ts`)
 - **Resolution Courts** — When a rumour reaches everyone in town (or an authority override triggers), the village gathers at the town square for a trial.
 - The accused delivers an LLM defense, and villagers vote to **Absolve**, **Exile** (inactive/hidden state), or **Execute** (permanent death).
+- **Belief-Consistent Sentencing** — `enforceBeliefConsistentCourtVote` runs after every non-cultist voter's LLM/fallback vote (cult members follow their bloc's directed vote instead, per `applyCultCourtInfluence`, and are unaffected by this check). A voter who does not actually hold a believer stance on any of the claims is forced to `absolve` regardless of what the LLM chose. A voter who chose `execute` is downgraded to `exile` unless they believe a genuinely court-eligible ("grave") claim with at least 85% confidence — an execute vote otherwise reads as inconsistent with how firmly that voter actually believes the accusation.
 
 ### Political Camps Subsystem (`PoliticalSystem.ts`)
 - **Political Camps (Gentry vs. Commons)** — Agents are split into wealth-ranked political camps.
 - A Steward or high-reputation villager periodically calls town assemblies to vote on economic policies (boosting specific jobs with wealth) or banishing Knights/Inquisitors.
-- **Office of the Alderman** — If a cult leader converts the entire village, they can run for Alderman (requiring a unanimous vote). Seating them grants absolute decree power, overriding court majority votes and assembly policies.
+- **Office of the Alderman** — If a cult leader converts the entire village, they can run for Alderman (requiring a unanimous vote). Seating them grants absolute decree power, overriding court majority votes and assembly policies. A successful, unanimous election now also fires an `alderman_named` Story Narration moment.
+- Gentry voters no longer lean toward supporting a wealth policy just because it favors Merchant/Steward trades — every wealth policy spends the village's funds, and the Gentry campLean is now a flat -0.4 against it regardless of beneficiary, with direct self-interest (the voter's own job matching the target job) as the remaining route to Gentry support.
 
 ### Story Narration Subsystem (`StorySystem.ts`)
-- Chronicles major town events and milestones (cult formation, prophet appointments, demonic summons, trials, etc.).
+- Chronicles major town events and milestones (cult formation, prophet appointments, demonic summons, trials, Alderman elections, outsider arrivals/deaths, deity relic manifestations, etc.).
 - Feeds these moments to a custom UI panel (`StoryNarrationPanel`) for visual display and narrative tracking.
+- `checkSurvivorComposition` and `checkCultExtinction` run every tick off `AgentManager`'s living-agent list rather than off any single death/exile event, since an agent can stop being alive through many separate paths (combat, starvation, suicide, execution, exile, sacrifice). Each narrates once per game: every living villager belonging to a cult (`only_cultists_survive`), a cult leader left as the sole living survivor (`cult_leader_sole_survivor`), and every cult that ever existed in the game having gone extinct (`cults_extinguished`, gated on a cult having actually existed at some point so a fresh village doesn't narrate its own absence).
 
 ### Scheduling Subsystem (`ScheduleSystem.ts`)
-- Generates and validates each agent's daily plan, starts/completes timed activity blocks, and runs the fallback/idle-recovery, exhaustion-sleep, night-sleep, and storm-shelter-seeking checks every tick.
+- Generates and validates each agent's daily plan, starts/completes timed activity blocks, and runs the fallback/idle-recovery, exhaustion-sleep, night-sleep, low-health-recovery, and storm-shelter-seeking checks every tick.
 - Owns `activeBlocks`/`dailySchedules` and every other system reaches it only through the shared `SystemDeps.startBlock`/`getAbsoluteMinute` callbacks — nothing else on the timeline manipulates blocks directly.
+- **Low-Health Recovery** (`enforceLowHealthRecovery`) — A sane, living, non-demon agent whose health drops below 50 is added to `recoveringHealthAgentIds` and stays there (even after ticking back above 50) until health reaches `maxHealth`, avoiding a stall right at the threshold. Once sleep (energy >= 90) and hunger (<= 40) needs are settled, and the agent isn't mid-sleep/flee/attack, it is redirected to `work` at the nearest apothecary for 30 minutes. Permanently insane agents are excluded, matching `enforceNightSleep`'s exclusion of the insane from routine, non-erratic behavior.
+- `enforceExhaustionSleep` — the last-resort collapse safety net for an agent at zero energy — no longer excludes permanently insane agents. They're still excluded from the *normal* nightly schedule so their behavior reads as erratic, but excluding them from this net too made insanity a guaranteed, irreversible death sentence via unrecoverable exhaustion.
 
 ### Decision Engine (`DecisionEngine.ts`)
 - Owns the per-agent LLM decision queue and `executeLLMDecision`, the dispatcher that turns a parsed LLM response into a concrete action (move/talk/attack/pray/preach/bribe/etc.) and routes it into whichever subsystem owns that action.
-- The one place in the codebase that legitimately needs direct references to all nine other systems, since a single decision can touch rumours, cult, religion, justice, or politics in the same turn.
+- The one place in the codebase that legitimately needs direct references to all eleven other systems, since a single decision can touch rumours, cult, religion, justice, or politics in the same turn.
+- **Targeted Preaching** — a `preach` decision for a cult member now first calls `CultSystem.findNearestConvertTarget` to find the closest living, convertible, non-immune villager. If one exists and is farther than `PREACH_LISTEN_RADIUS - 3`, the agent moves toward them instead of the shrine; once in range, preaching proceeds targeting that villager. With no convert target, preaching falls back to the previous shrine-travel behavior. `ScheduleSystem`'s in-progress `preach` block tracks `stillTraveling` against the live convert target's distance (falling back to shrine-distance) so the travel phase resolves correctly either way.
 
 ### Social Subsystem (`SocialSystem.ts`)
 - Detects agent-to-agent encounters, batches/pre-generates conversation turns, and builds the contextual dialogue (including rumour mentions) fed to the LLM for a conversation turn.
 
 ### Outsider Subsystem (`OutsiderSystem.ts`)
 - Spawns and drives Knights (arrive after repeated deaths) and Inquisitors (arrive when a Priest confirms multiple cultists), including their patrol/pursuit/combat behavior once in the world.
+- Each arrival fires its own `knight_called`/`inquisitor_called` Story Narration moment. `AgentManager.handleOutsiderKilled` listens on the same `attack`-death event `handleCultLeaderKilled` already watches and fires `knight_killed`/`inquisitor_killed` when the victim is a living outsider, rather than threading a story-moment call through every kill path (combat, sacrifice) that could end an outsider's life.
 
 ### Environment Subsystem (`EnvironmentSystem.ts`)
 - Ticks once per simulated minute, collecting active corruption sources — cult shrines (scaled by living membership; a corrupted Priest's congregation anchors on its rededicated church instead, since that cult never builds a separate `CULT_SHRINE`), living Demons (strongest, moves with them), and in-progress summoning rituals — and spreads a decaying 0..1 corruption value into a sparse map of nearby tiles with distance falloff.
@@ -344,16 +359,17 @@ The event queues an LLM reaction for affected agents
 - Corruption only grows near an active source and decays back to zero once nothing sustains it, so the transient tint is a reversible, visible consequence of cult/demon activity rather than permanent world damage.
 - **Eldritch Blight**: a GRASS/WATER tile that stays at or above `BLIGHT_THRESHOLD` for `BLIGHT_SUSTAIN_MINUTES` straight simulated minutes permanently converts its actual `TileType` to `BLIGHTED`/`BRACKISH_WATER` -- this survives the transient corruption value later decaying to zero, and the first such conversion ever fires its own `eldritch_blight` Story Narration moment distinct from `land_corrupted`.
 - `advanceCorruption()` gates on `Math.floor(getAbsoluteMinute())`, not the raw value -- `SimulationManager.updateDayNight` advances simulated time as a continuously-changing float every frame, so comparing the unfloored value would make the "once per simulated minute" throttle (and therefore every rate constant tuned against it) fire on nearly every frame instead.
+- **Map-Wide Demon Saturation** (`saturateWholeMap`) — the moment a bound Demon manifests (`ReligionSystem.summonDemon`, via `SystemDeps.saturateMapCorruption`), every tile on the map is slammed to full (1.0) corruption instantly, rather than letting corruption crawl outward from the summoning site at the usual `GROWTH_RATE`. Tiles outside the Demon's own `DEMON_RADIUS` still decay back down over time via the normal `advanceCorruption` loop once nothing else touches them — this only guarantees the map-wide shock of the manifestation itself.
 
 ### Relic Subsystem (`RelicSystem.ts`)
-- When `RumourSystem.completeRumourInvestigation` finishes (any investigation, verified or not), there is a flat 16% chance (`RELIC_CREATION_CHANCE`) the investigator pens their findings into a `ForbiddenRelic` (`World.relics`, keyed by id, rendered on the map as a diamond marker and persisted for free through the existing world save/load path) instead of the finding simply living on the rumour.
+- When `RumourSystem.completeRumourInvestigation` finishes (any investigation, verified or not), there is a flat 16% chance (`RELIC_CREATION_CHANCE`) the investigator pens their findings into a `ForbiddenRelic` (`World.relics`, keyed by id, rendered on the map as a diamond marker and persisted for free through the existing world save/load path) instead of the finding simply living on the rumour. A relic created this way fires a `forbidden_relic_created` Story Narration moment.
 - A separate roll (base 35% chance, raised by 30% if the author already carries `forbiddenKnowledge` entries, and by 15% if the rumour text is cult/ritual-flavored, up to an 85% cap) decides whether the relic's text actually contains forbidden knowledge. If it does, the author immediately risks their own sanity via `applyExistentialWitnessReaction(..., 'forbidden_relic')` -- the same denial/reinterpretation/obsession/nihilism/revelation/madness branching used elsewhere for reality-breaking reveals, up to and including permanent insanity.
 - If the author belonged to a cult when they wrote it, the relic is tagged with that cult's id/name and deity (`chooseDeityName`); a relic with no cult tag has no conversion effect, only the forbidden-knowledge risk.
 - `advanceRelics()` ticks once per simulated minute: any living agent who is not the author, not already a member of the relic's cult (or is a member of a group actively opposed to it), and wanders within `DISCOVERY_RADIUS` (2.5 tiles) of it triggers a one-time discovery -- applying the same existential-witness roll if the relic is forbidden, and, for a cult-tagged relic, a personality-weighted chance of `maybeTriggerWillingCultJoin` toward that deity. Each agent only ever triggers a given relic's discovery once (`ForbiddenRelic.discoveredByAgentIds`).
 - A relic never decays or is consumed by discovery -- it stays on the map (and in the HUD's relic count) as a standing, re-discoverable hazard for every agent who passes near it afterward, unlike a rumour or a planted dream.
-- **Deity Forbidden Relic Placement**: The player can invoke a Deity ability to construct and place a custom forbidden relic directly on a map grid tile. The relic is tagged with an associated deity and has a fixed severity of 90. If an agent wanders within the discovery radius:
+- **Deity Forbidden Relic Placement**: The player can invoke a Deity ability to construct and place a custom forbidden relic directly on a map grid tile, firing a `deity_relic_created` Story Narration moment distinct from an organically-written relic's. The relic is tagged with an associated deity and has a fixed severity of 90. If an agent wanders within the discovery radius:
   - If the agent already believes in the relic's associated deity (confidence >= 50%), they are unaffected and ignore the relic.
-  - If they do not already believe in that deity, they gain the written text as forbidden knowledge (appended to `forbiddenKnowledge`), and face an immediate 80% chance of permanent insanity (triggering the `'madness'` reaction via `resolveExistentialReaction`). Otherwise, they resolve the knowledge via normal existential-witness reactions.
+  - If they do not already believe in that deity, they gain the written text as forbidden knowledge (appended to `forbiddenKnowledge`), and face an immediate 80% chance of permanent insanity (triggering the `'madness'` reaction via `resolveExistentialReaction`) — **unless they are a cultist** (`agent.state.secretProphet || agent.state.cult != null`), whose conviction shields them from this roll entirely, the same exemption applied to forbidden-knowledge rumours. Otherwise, they resolve the knowledge via normal existential-witness reactions.
 
 ### Dreamscape Subsystem (`ReligionSystem.ts` / `ScheduleSystem.ts`)
 - `ReligionSystem.plantDream` is an invocation-gated Deity ability that plants free-text bias into a currently-sleeping, cult-unaligned villager's mind (`AgentState.dream`); cult members are immune, mirroring the existing Church-of-Christ shielding pattern.

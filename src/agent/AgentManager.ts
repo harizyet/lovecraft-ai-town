@@ -586,6 +586,7 @@ export class AgentManager {
     this.religionSystem.prioritizePropheticTasks()
     this.scheduleSystem.enforceExhaustionSleep()
     this.scheduleSystem.enforceNightSleep()
+    this.scheduleSystem.enforceLowHealthRecovery()
     this.justiceSystem.cancelInvalidResolutionCourt()
     this.justiceSystem.maybeStartResolutionCourt()
     if (this.justiceSystem.advanceResolutionCourt()) return
@@ -621,6 +622,8 @@ export class AgentManager {
     this.religionSystem.ensureDailyPropheticClaim()
     this.decisionEngine.processDecisionQueue()
     this.scheduleSystem.ensureDailyPlans()
+    this.storySystem.checkSurvivorComposition(this.agents)
+    this.storySystem.checkCultExtinction(this.agents)
   }
 
 
@@ -654,6 +657,7 @@ export class AgentManager {
     this.decisionEngine.state.llmRequestStatuses.delete(agent.state.id)
     this.scheduleSystem.state.dailySchedules.delete(agent.state.id)
     this.scheduleSystem.state.scheduleCursors.delete(agent.state.id)
+    this.scheduleSystem.state.recoveringHealthAgentIds.delete(agent.state.id)
     agent.state.path = []
     agent.state.pathIndex = 0
     agent.state.alive = false

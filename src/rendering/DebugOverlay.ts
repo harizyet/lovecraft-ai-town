@@ -772,24 +772,28 @@ export class DebugOverlay {
     if (simulationMinute !== undefined) this.latestSimulationMinute = simulationMinute
     const content = this.cultTrackerPanel.querySelector<HTMLElement>('#cult-group-content')
     if (!content) return
+    // Death/exile drops an agent from these roster cards; the full history
+    // (including dead/exiled members) is still available in the detail
+    // popups below, which read from this.latestAgents directly.
+    const livingAgents = agents.filter((agent) => agent.alive)
     const cults = new Map<string, { name: string; leader?: AgentState; members: AgentState[] }>()
-    for (const agent of agents) {
+    for (const agent of livingAgents) {
       if (!agent.cult) continue
       const cult = cults.get(agent.cult.id) ?? { name: agent.cult.name, members: [] }
       cult.members.push(agent)
       if (agent.cult.role === 'leader' || agent.cult.role === 'founder') cult.leader = agent
       cults.set(agent.cult.id, cult)
     }
-    const allianceGroups = this.collectAllianceGroups(agents)
+    const allianceGroups = this.collectAllianceGroups(livingAgents)
     const antiCultGroups = new Map<string, AgentState[]>()
-    for (const agent of agents.filter((candidate) => candidate.antiCultGroup)) {
+    for (const agent of livingAgents.filter((candidate) => candidate.antiCultGroup)) {
       const groupId = agent.antiCultGroup!.id
       const members = antiCultGroups.get(groupId) ?? []
       members.push(agent)
       antiCultGroups.set(groupId, members)
     }
     const factions = new Map<PoliticalCampId, { name: string; members: AgentState[] }>()
-    for (const agent of agents) {
+    for (const agent of livingAgents) {
       if (!agent.politicalCamp) continue
       const faction = factions.get(agent.politicalCamp.id) ?? { name: agent.politicalCamp.name, members: [] }
       faction.members.push(agent)
@@ -799,7 +803,7 @@ export class DebugOverlay {
       ? Array.from(cults.entries()).map(([cultId, cult]) => `<div data-cult-id="${this.escapeHtml(cultId)}" title="Open complete cult details" style="padding:7px;margin-bottom:6px;background:rgba(240,98,146,.07);border-left:3px solid #ec407a;cursor:pointer;">
           <div style="color:#f48fb1;font-weight:bold;">${this.escapeHtml(cult.name)}</div>
           <div style="color:#b0bec5;">Leader: ${cult.leader ? `<button data-agent-id="${this.escapeHtml(cult.leader.id)}" style="border:0;background:transparent;color:#80cbc4;padding:0;cursor:pointer;font:inherit;">${this.escapeHtml(cult.leader.name)}</button>` : 'unknown'}</div>
-          <div style="color:#8e7c87;">Members (${cult.members.length}): ${cult.members.map((member) => this.escapeHtml(member.name)).join(', ')}</div>
+          <div style="color:#8e7c87;">Members (${cult.members.length} living): ${cult.members.map((member) => this.escapeHtml(member.name)).join(', ')}</div>
         </div>`).join('')
       : '<div style="color:#795c6b;margin-bottom:7px;">No cult has formed.</div>'
     const allianceHtml = allianceGroups.length
@@ -814,13 +818,12 @@ export class DebugOverlay {
     const factionHtml = factions.size
       ? `<div style="color:#8e7c87;font-weight:bold;border-top:1px solid #472b3a;padding-top:6px;margin-top:6px;">Political factions</div>` +
         Array.from(factions.entries()).map(([factionId, faction]) => {
-          const living = faction.members.filter((member) => member.alive)
-          const avgWealth = living.length
-            ? Math.round(living.reduce((sum, member) => sum + member.wealth, 0) / living.length)
+          const avgWealth = faction.members.length
+            ? Math.round(faction.members.reduce((sum, member) => sum + member.wealth, 0) / faction.members.length)
             : 0
           return `<div data-faction-id="${this.escapeHtml(factionId)}" title="Open faction details" style="padding:7px;margin-top:6px;background:rgba(91,111,168,.1);border-left:3px solid #5b6fa8;cursor:pointer;">
             <div style="color:#c5cdf8;font-weight:bold;">${this.escapeHtml(faction.name)}</div>
-            <div style="color:#b0bec5;">Members (${faction.members.length}, ${living.length} living): ${faction.members.map((member) => this.escapeHtml(member.name)).join(', ')}</div>
+            <div style="color:#b0bec5;">Members (${faction.members.length} living): ${faction.members.map((member) => this.escapeHtml(member.name)).join(', ')}</div>
             <div style="color:#8e7c87;">Avg wealth: ${avgWealth}</div>
           </div>`
         }).join('')

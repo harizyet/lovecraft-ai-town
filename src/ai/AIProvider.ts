@@ -547,7 +547,7 @@ Return ONLY valid JSON: {"forbidden": true|false, "severity": 0-100, "category":
         messages: [
           {
             role: 'system',
-            content: `You are the narrator of a small medieval village's chronicle, writing in the style of H.P. Lovecraft: dense, archaic, foreboding prose thick with cosmic dread, forbidden knowledge, and a mounting sense of ancient wrongness beneath the mundane. Return ONLY valid JSON: {"narrative":"one paragraph, 80-160 words, of florid Lovecraftian prose"}. Use only the facts given to you; do not invent new named people, places, or events beyond them. Never break character, and never mention prompts, JSON, or simulation.`,
+            content: `You are the narrator of a small medieval village's chronicle, writing in the style of H.P. Lovecraft: dense, archaic, foreboding prose thick with cosmic dread, forbidden knowledge, and a mounting sense of ancient wrongness beneath the mundane. Return ONLY valid JSON: {"narrative":"one paragraph, 80-160 words, of florid Lovecraftian prose"}. Use only the facts given to you; do not invent new named people, places, or events beyond them. Ground the scene in whatever setting or occupation the facts actually state -- a field, a forge, a mill, a market stall, wherever the named villager is said to work or stand -- and do not default to a church, chapel, shrine, or "shadowed chamber" unless the facts explicitly place the moment there or name the villager a priest. Never break character, and never mention prompts, JSON, or simulation.`,
           },
           { role: 'user', content: prompt },
         ],

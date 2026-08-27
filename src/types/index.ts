@@ -487,7 +487,7 @@ export interface Rumour {
   timelineSummary?: string
 }
 
-export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight' | 'forbidden_relic_created' | 'deity_relic_created' | 'alderman_named' | 'knight_called' | 'inquisitor_called' | 'knight_killed' | 'inquisitor_killed'
+export type StoryMomentKind = 'cult_formed' | 'prophet_appointed' | 'demon_created' | 'priest_corrupted' | 'church_corrupted' | 'flock_corrupted' | 'first_cultist_recruited' | 'believer_poached' | 'deity_ability_first_used' | 'land_corrupted' | 'eldritch_blight' | 'forbidden_relic_created' | 'deity_relic_created' | 'alderman_named' | 'knight_called' | 'inquisitor_called' | 'knight_killed' | 'inquisitor_killed' | 'only_cultists_survive' | 'cult_leader_sole_survivor' | 'cults_extinguished'
 
 export interface StoryMoment {
   id: string

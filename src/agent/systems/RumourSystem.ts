@@ -1759,15 +1759,16 @@ Your private reaction: ${thoughtEvent.description}`,
     rumour: Rumour,
     classification: ForbiddenKnowledgeClassification
   ): Promise<void> {
-    // A cult leader (secret or open) is meant to survive whatever revelation
-    // created them. Flooring their sanity just above zero isn't enough --
-    // isInsane() treats sanity <= 20 as insane on its own, independent of
-    // permanentInsanity, so even a floored-at-1 leader would sit in that
-    // state permanently and still get caught by update()'s ongoing
-    // panic/suicide roll. Only a full exemption from the damage keeps them
-    // out of that loop.
-    const isCultLeader = recipient.state.secretProphet ||
-      (recipient.state.cult != null && ['leader', 'founder'].includes(recipient.state.cult.role))
+    // A cultist (secret prophet, leader, or rank-and-file member) is meant to
+    // survive whatever revelation created or was embraced by the cult --
+    // conviction in a hidden truth is unlikely to break someone who has
+    // already organized their life around it. Flooring their sanity just
+    // above zero isn't enough -- isInsane() treats sanity <= 20 as insane on
+    // its own, independent of permanentInsanity, so even a floored-at-1
+    // member would sit in that state permanently and still get caught by
+    // update()'s ongoing panic/suicide roll. Only a full exemption from the
+    // damage keeps them out of that loop.
+    const isCultist = recipient.state.secretProphet || recipient.state.cult != null
     const severity = Math.max(1, Math.min(100, Math.round(classification.severity)))
     // The classifier itself grades severity by directness (see its prompt: a
     // vague unsettling hint scores 20-40, a clear direct statement scores
@@ -1784,7 +1785,7 @@ Your private reaction: ${thoughtEvent.description}`,
     }
     recipient.state.forbiddenKnowledge = [...(recipient.state.forbiddenKnowledge ?? []), entry]
 
-    if (isCultLeader || isMereHint) {
+    if (isCultist || isMereHint) {
       recipient.state.lastReasoning = isMereHint
         ? 'Something about what I just heard doesn\'t sit right with me. A hint of a truth I can\'t quite place.'
         : recipient.state.lastReasoning
@@ -1792,8 +1793,8 @@ Your private reaction: ${thoughtEvent.description}`,
         type: 'forbidden_knowledge',
         agentId: recipient.state.id,
         actionType: ActionType.IDLE,
-        outcome: isCultLeader ? 'resisted' : 'hinted',
-        description: isCultLeader
+        outcome: isCultist ? 'resisted' : 'hinted',
+        description: isCultist
           ? `${recipient.state.name} learned something no mind should hold: "${rumour.text}". Their conviction as a cult leader held their sanity steady.`
           : `${recipient.state.name} caught only a vague, unsettling hint in "${rumour.text}" -- too indirect to shake their sanity, but it lingers.`,
         causationIds: [],

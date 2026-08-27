@@ -110,6 +110,12 @@ export class StoryNarrationPanel {
         return 'The Knight Falls'
       case 'inquisitor_killed':
         return 'The Inquisitor Falls'
+      case 'only_cultists_survive':
+        return 'The Village That Remains'
+      case 'cult_leader_sole_survivor':
+        return 'Alone With The Faith'
+      case 'cults_extinguished':
+        return 'The Last Cult Falls'
       default:
         return 'From the Village Chronicle'
     }
