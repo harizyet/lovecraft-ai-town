@@ -1260,7 +1260,7 @@ export class DebugOverlay {
 
         return `<div data-agent-id="${this.escapeHtml(a.id)}" title="${isSelected ? 'Collapse' : 'Select and follow'} ${this.escapeHtml(a.name)}" style="padding: 4px 0; border-bottom: 1px solid #222; cursor: pointer; ${isSelected ? 'background: rgba(255, 215, 0, 0.1); border-left: 3px solid #ffd700; padding-left: 7px;' : ''}">
           <div style="display:flex;align-items:center;gap:5px;">
-            ${this.renderJobIconSpan(a.currentJob)}
+             ${this.renderJobIconSpan(a.currentJob)}
             <span style="color: ${statusColor}; font-weight: bold;">${this.escapeHtml(a.name)}</span>
             ${roleBadges}
             <span style="color: ${statusColor};">(${statusText})</span>
@@ -1268,19 +1268,14 @@ export class DebugOverlay {
             <button data-agent-details="${this.escapeHtml(a.id)}" title="Open full details for ${this.escapeHtml(a.name)}" style="margin-left:auto;padding:2px 6px;border:1px solid #455a64;border-radius:3px;background:#263238;color:#b3e5fc;cursor:pointer;font:inherit;">Details</button>
           </div>
           <div style="color: #888; margin-top: 2px;">
-            HP: ${Math.round(a.health)}/${Math.round(a.maxHealth)} | Hunger: ${Math.round(a.needs.hunger)} | Energy: ${Math.round(a.needs.energy)} | Social: ${Math.round(a.needs.social)}
+            HP: ${Math.round(a.health)}/${Math.round(a.maxHealth)} | Sanity: ${Math.round(a.sanity)}/100 | Job: ${a.currentJob ?? 'None'}
           </div>
           <div style="color: #666; margin-top: 1px;">
-            Pos: (${Math.round(a.position.x)}, ${Math.round(a.position.y)}) | Job: ${a.currentJob ?? 'None'} | Reputation: ${Math.round(a.reputation)}/100
+            Diety: ${a.demon ? 'none' : worldviewHidden ? 'hidden' : deitySummary} | Camp: ${this.escapeHtml(a.politicalCamp?.name ?? 'unaffiliated')} | Personality: ${personalitySummary}
           </div>
-          <div style="color:#c5e1a5;margin-top:1px;">Wealth: ${Math.round(a.wealth)} | Camp: ${this.escapeHtml(a.politicalCamp?.name ?? 'unaffiliated')}</div>
-          <div style="color:#ffcc80;margin-top:1px;">Personality: ${personalitySummary}</div>
-          <div style="color:#9575cd;margin-top:1px;">${a.demon ? 'Worldview: none | Faith: none | Deity beliefs: none' : worldviewHidden ? 'Worldview: undisclosed | Faith and deity beliefs hidden' : `Worldview: ${this.escapeHtml(a.beliefSystem.religiousStance)} | Faith: ${Math.round(a.beliefSystem.faith)}/100 | Deity beliefs: ${deitySummary}`}</div>
           ${a.cult ? `<div style="color:#f48fb1;margin-top:1px;">Cult: ${this.escapeHtml(a.cult.name)} · ${this.escapeHtml(a.cult.role)}</div>` : ''}
           ${blessingSummary ? `<div style="color:#ffd54f;margin-top:1px;">Bonus: ${blessingSummary}</div>` : ''}
           <div style="color:${activityColor};margin-top:2px;font-weight:bold;">Current action: ${this.escapeHtml(currentActivity)}</div>
-          <div style="color: ${llmStatusColor[llmStatus]}; margin-top: 1px;">LLM request: ${llmStatus}</div>
-          ${memoryDisplay}
         </div>`
       })
       .join('')
@@ -1353,6 +1348,7 @@ export class DebugOverlay {
       ${this.detailSection('Fears, grudges, and alliances', `Fears: ${agent.fears.map((id) => this.escapeHtml(names.get(id) ?? id)).join(', ') || 'none'}<br>Grudges: ${agent.grudges.map((id) => this.escapeHtml(names.get(id) ?? id)).join(', ') || 'none'}<br>Alliances: ${agent.alliances.map((id) => this.escapeHtml(names.get(id) ?? id)).join(', ') || 'none'}`)}
       ${this.detailSection('Memory summary', this.escapeHtml(agent.memory.summary || 'No compacted summary.'))}
       ${this.detailSection(`Recent memories (${agent.memory.recent.length})`, `<div data-agent-recent-memories style="max-height:260px;overflow-y:auto;">${memories}</div>`)}
+      ${this.detailSection('Raw LLM Debug Info', `<strong>Last Raw LLM Query:</strong><pre style="white-space:pre-wrap;background:#1e1e1e;padding:6px;border-radius:4px;max-height:200px;overflow-y:auto;color:#d4d4d4;margin:4px 0 8px;">${this.escapeHtml(details?.lastLLMQuery ?? 'No query recorded yet')}</pre><strong>Last Raw LLM Result:</strong><pre style="white-space:pre-wrap;background:#1e1e1e;padding:6px;border-radius:4px;max-height:200px;overflow-y:auto;color:#d4d4d4;margin:4px 0 0;">${this.escapeHtml(details?.lastLLMResponse ?? 'No response recorded yet')}</pre>`)}
     `
     body.scrollTop = bodyScrollTop
     const currentMemories = body.querySelector<HTMLElement>('[data-agent-recent-memories]')

@@ -1265,12 +1265,15 @@ export class AgentManager {
   public getAgentDebugDetails(): Record<string, import('@/types').AgentDebugDetails> {
     return Object.fromEntries(this.agents.map((agent) => {
       const active = this.scheduleSystem.state.activeBlocks.get(agent.state.id)
+      const lastTx = this.aiProvider?.getLastTransaction(agent.state.name)
       return [agent.state.id, {
         schedule: this.scheduleSystem.state.dailySchedules.get(agent.state.id),
         scheduleCursor: this.scheduleSystem.state.scheduleCursors.get(agent.state.id) ?? 0,
         activeAction: active?.action,
         activeEndsAt: active?.endsAt,
         queuedTriggers: [...(this.decisionEngine.state.decisionQueue.get(agent.state.id) ?? [])],
+        lastLLMQuery: lastTx?.query,
+        lastLLMResponse: lastTx?.response,
       }]
     }))
   }

@@ -557,7 +557,7 @@ export class SimulationManager {
 
   start(): void {
     if (!this.restoreState()) {
-      this.world.generate()
+      this.world.generate(this.config.agentCount)
       this.initializeAgents(this.config.agentCount)
     }
 
@@ -725,13 +725,15 @@ export class SimulationManager {
     if (hour >= dawnEnd && hour <= duskStart) {
       this.dayNight.brightness = 1
     } else if (hour >= duskStart && hour <= duskEnd) {
-      this.dayNight.brightness = 1 - (hour - duskStart)
-    } else if (hour >= 19 || hour <= dawnStart) {
-      this.dayNight.brightness = 0.3
+      // Interpolate from 1.0 down to 0.2 over 2 hours
+      this.dayNight.brightness = 1 - (hour - duskStart) * 0.4
+    } else if (hour >= duskEnd || hour <= dawnStart) {
+      this.dayNight.brightness = 0.2
     } else if (hour >= dawnStart && hour <= dawnEnd) {
-      this.dayNight.brightness = 0.3 + (hour - dawnStart) * 0.7
+      // Interpolate from 0.2 up to 1.0 over 2 hours
+      this.dayNight.brightness = 0.2 + (hour - dawnStart) * 0.4
     } else {
-      this.dayNight.brightness = 0.3
+      this.dayNight.brightness = 0.2
     }
   }
 

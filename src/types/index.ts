@@ -225,6 +225,8 @@ export interface AgentDebugDetails {
   activeAction?: AgentAction
   activeEndsAt?: number
   queuedTriggers: DecisionTrigger[]
+  lastLLMQuery?: string
+  lastLLMResponse?: string
 }
 
 export type LLMRequestStatus = 'idle' | 'pending' | 'sent' | 'retrying' | 'failed'

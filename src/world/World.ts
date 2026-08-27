@@ -17,12 +17,12 @@ export class World {
     this.relics = new Map()
   }
 
-  generate(): void {
+  generate(maxBuildings?: number): void {
     this.buildings.clear()
     this.initializeTiles()
     this.generateTerrain()
     this.generateRoads()
-    this.placeBuildings()
+    this.placeBuildings(maxBuildings)
     this.generateTrees()
   }
 
@@ -137,27 +137,28 @@ export class World {
     }
   }
 
-  private placeBuildings(): void {
+  private placeBuildings(maxBuildings?: number): void {
     const buildingTypes: BuildingType[] = [
-      BuildingType.HOME,
-      BuildingType.HOME,
-      BuildingType.HOME,
-      BuildingType.HOME,
-      BuildingType.MANOR,
-      BuildingType.SMITHY,
-      BuildingType.CARPENTER_WORKSHOP,
-      BuildingType.MARKET,
-      BuildingType.GUARDHOUSE,
-      BuildingType.APOTHECARY,
-      BuildingType.TAVERN,
-      BuildingType.FARM,
       BuildingType.TOWN_SQUARE,
       BuildingType.CHURCH,
+      BuildingType.GUARDHOUSE,
+      BuildingType.APOTHECARY,
+      BuildingType.FARM,
+      BuildingType.HOME,
+      BuildingType.TAVERN,
+      BuildingType.SMITHY,
+      BuildingType.MARKET,
+      BuildingType.CARPENTER_WORKSHOP,
+      BuildingType.MANOR,
+      BuildingType.HOME,
+      BuildingType.HOME,
+      BuildingType.HOME,
     ]
 
     const roadPositions = this.findRoadPositions()
 
     for (const buildingType of buildingTypes) {
+      if (maxBuildings !== undefined && this.buildings.size >= maxBuildings) break
       if (roadPositions.length === 0) break
 
       const size =

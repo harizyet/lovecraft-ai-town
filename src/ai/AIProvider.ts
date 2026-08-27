@@ -55,6 +55,7 @@ export interface AIProvider {
   interpretExistentialReaction(agentName: string, prompt: string): Promise<ExistentialReactionResult>
   generateCultName(claimText: string, revelationText: string): Promise<string>
   narrateKeyMoment(prompt: string): Promise<string>
+  getLastTransaction(agentName: string): { query: string; response: string } | undefined
   isAvailable(): boolean
   getQueryStats(): LLMQueryStats
 }
@@ -83,6 +84,12 @@ export class LMStudioProvider implements AIProvider {
   private queryStats: LLMQueryStats
   private consecutiveFailures: number = 0
 
+  private lastTransactions: Map<string, { query: string; response: string }> = new Map()
+
+  public getLastTransaction(agentName: string): { query: string; response: string } | undefined {
+    return this.lastTransactions.get(agentName)
+  }
+
   constructor(config: LMStudioConfig) {
     this.config = {
       endpoint: config.endpoint || 'http://localhost:1234',
@@ -99,13 +106,49 @@ export class LMStudioProvider implements AIProvider {
     void this.checkAvailability()
   }
 
-  private async fetchWithTracking(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  private async fetchWithTracking(
+    input: RequestInfo | URL,
+    init?: RequestInit
+  ): Promise<Response> {
     try {
       const response = await fetch(input, init)
       if (!response.ok) {
         this.handleFailure()
       } else {
         this.resetConsecutiveFailures()
+        if (init?.body) {
+          try {
+            const bodyObj = JSON.parse(init.body as string)
+            const messages = bodyObj.messages || []
+            const systemMessage = messages.find((m: any) => m.role === 'system')?.content || ''
+            
+            const agentNames: string[] = []
+            const singleMatch = systemMessage.match(/^You are ([^,\.]+)/)
+            if (singleMatch) {
+              agentNames.push(singleMatch[1].trim())
+            } else {
+              const pairMatch = systemMessage.match(/between two villagers in a small medieval village, (.*?) and (.*?)\. Return/)
+              if (pairMatch) {
+                agentNames.push(pairMatch[1].trim(), pairMatch[2].trim())
+              }
+            }
+
+            if (agentNames.length > 0) {
+              const responseClone = response.clone()
+              responseClone.json().then((data) => {
+                const content = data.choices?.[0]?.message?.content ?? ''
+                const query = messages.map((m: any) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n')
+                for (const name of agentNames) {
+                  this.lastTransactions.set(name, { query, response: content })
+                }
+              }).catch((err) => {
+                console.error('[AIProvider] Error reading response clone for tracking:', err)
+              })
+            }
+          } catch (e) {
+            console.error('[AIProvider] Error tracking transaction:', e)
+          }
+        }
       }
       return response
     } catch (error) {
