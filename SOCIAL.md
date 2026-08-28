@@ -784,9 +784,16 @@ Every vocation affords quiet influence. A planted object is only available to tr
 
 An LLM's proposed scheme is checked against what the leader's actual trade affords before anything happens: a proposal asking for a tactic the leader's vocation doesn't support is rejected outright, not weakened or reinterpreted. A rejection prompts one retry with the specific reason folded back into the request; if that also fails, a small, deliberately unremarkable fallback scheme for that trade is used instead, so a struggling local model never blocks a leader's turn entirely. Nothing about the fallback path is mechanically weaker than an LLM-authored scheme — only its flavor text is blander.
 
+### Preparing the scheme
+
+A scheme is not instant. Once the leader decides on one, they physically travel to a building of their own trade and are visibly occupied there — the same way any villager is occupied by an ordinary work block — for about half an hour of simulated time before the scheme actually takes effect. Nothing about this preparation reads as suspicious on its own: to any onlooker, the leader is simply attending to their trade a little longer than usual. This window can be interrupted the same way any other activity can — an attack, an exile, a summons to court — in which case the scheme is abandoned rather than completing partway.
+
 ### Discovery
 
-A scheme that plants a relic gets caught the same way any relic does: a villager who wanders close enough reads it, and depending on what it actually contains, that can end in nothing more than a quiet nudge toward the cult, or in the same sanity risk (and eventual investigation trail) that any other forbidden writing poses. Nothing about a scheme-planted relic is hidden from the systems that already watch for this — investigators, priests, and the Sheriff treat it exactly like an ordinary relic once it's found.
+There are now two separate ways a scheme can be noticed, corresponding to its two stages:
+
+- **During preparation**: if a Priest, Town Guard, or Inquisitor happens to be nearby while the leader is quietly occupied at their trade, there's a small chance — raised by the witness's own curiosity, lowered by the leader's caution — that they notice something is off. This doesn't interrupt or weaken the scheme; it simply plants an ordinary, unverified rumour naming the leader as having behaved strangely, which then has to make its way through the same propagation, investigation, and court machinery as any other suspicion before it amounts to anything. A leader is never told they were seen.
+- **After the fact**: a scheme that plants a relic gets caught the same way any relic does — a villager who wanders close enough reads it, and depending on what it actually contains, that can end in nothing more than a quiet nudge toward the cult, or in the same sanity risk (and eventual investigation trail) that any other forbidden writing poses. Nothing about a scheme-planted relic is hidden from the systems that already watch for this — investigators, priests, and the Sheriff treat it exactly like an ordinary relic once it's found.
 
 ## Village endings
 
