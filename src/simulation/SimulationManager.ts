@@ -460,12 +460,12 @@ export class SimulationManager {
         prompt?: string
       }>).detail
       const result = !this.agentManager
-        ? { success: false, message: 'Demon controls are unavailable.' }
+        ? { success: false, message: 'Entity controls are unavailable.' }
         : detail?.action === 'create'
           ? this.agentManager.createDemon(detail.prompt ?? '')
           : detail?.action === 'command'
             ? this.agentManager.commandDemon(detail.demonId, detail.prompt ?? '')
-            : { success: false, message: 'Choose a Demon action.' }
+            : { success: false, message: 'Choose an Entity action.' }
       window.dispatchEvent(new CustomEvent('debug-demon-action-result', { detail: result }))
       this.updateDebugOverlay()
     })

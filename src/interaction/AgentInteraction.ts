@@ -17,8 +17,7 @@ export class AgentInteraction {
     target: Agent,
     allAgents: Agent[]
   ): { damage: number; died: boolean; instantKill: boolean; eventId: string } {
-    const demonProtected = Boolean(target.state.demon) &&
-      !['knight', 'inquisitor'].includes(attacker.state.outsider?.kind ?? '')
+    const demonProtected = Boolean(target.state.demon)
     const instantKill = !demonProtected && target.state.alive && Math.random() < AgentInteraction.INSTANT_KILL_CHANCE
     const damage = instantKill
       ? target.state.health
@@ -35,7 +34,7 @@ export class AgentInteraction {
       targetId: target.state.id,
       outcome: died ? 'death' : demonProtected ? 'invulnerable' : 'injury',
       description: demonProtected
-        ? `${attacker.state.name} attacked ${target.state.name}, but the Demon was invulnerable to the non-outsider attack.`
+        ? `${attacker.state.name} attacked ${target.state.name}, but the Entity is not a thing that can be slain by mortal weapons - the blow passed through it as if it were smoke.`
         : `${attacker.state.name} attacked ${target.state.name} for ${damage} damage${instantKill ? ' - LETHAL STRIKE' : died ? ' - KILLED' : ''}`,
       causationIds: this.findCausation(attacker.state.id, 'aggression'),
       worldStateDelta: {

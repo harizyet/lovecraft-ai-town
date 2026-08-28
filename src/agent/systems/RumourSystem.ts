@@ -1456,6 +1456,9 @@ Your private reaction: ${thoughtEvent.description}`,
     if ((job === 'Priest' || job === 'Inquisitor') && matches([
       'cult', 'cultist', 'sect', 'ritual', 'forbidden rite', 'hidden shrine', 'hooded', 'heretic',
     ])) return 'religious inquiry into suspected secret worship'
+    if (job === 'Knight' && matches([
+      'dead', 'death', 'kill', 'killed', 'murder', 'corpse', 'body', 'blood', 'attack', 'assault', 'slain',
+    ])) return 'criminal investigation into the cause of death'
     if ((job === 'Nurse' || job === 'Paramedic') && matches([
       'hurt', 'injur', 'sick', 'ill', 'dead', 'death', 'poison', 'medicine', 'hospital',
       'health', 'collapse', 'accident', 'attack', 'assault', 'damage',

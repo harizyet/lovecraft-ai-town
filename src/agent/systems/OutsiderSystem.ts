@@ -95,8 +95,8 @@ export class OutsiderSystem {
       actionType: ActionType.MOVE,
       outcome: `${kind}_arrived`,
       description: kind === 'knight'
-        ? `${outsider.state.name}, a Knight from beyond the village, entered town after word spread of multiple deaths.`
-        : `${outsider.state.name}, an Inquisitor, entered town after ${caller?.state.name ?? 'a Priest'} confirmed multiple cultists and called for aid.`,
+        ? `${outsider.state.name}, a Knight from beyond the village, entered town to investigate the cause of the recent deaths after word spread.`
+        : `${outsider.state.name}, an Inquisitor, entered town to investigate suspected cult activity after ${caller?.state.name ?? 'a Priest'} confirmed multiple cultists and called for aid.`,
       causationIds: [],
       worldStateDelta: {
         outsiderKind: kind,
@@ -145,7 +145,7 @@ export class OutsiderSystem {
           const action: AgentAction = {
             action: 'attack',
             target: demon.state.name,
-            reasoning: `Demon sighted! Engaging the Demon ${demon.state.name} in mortal combat.`,
+            reasoning: `Entity sighted! Confronting the Entity ${demon.state.name}, though no mortal weapon can end it.`,
             emotionalState: 'determined',
             durationMinutes: 1,
           }
@@ -176,7 +176,7 @@ export class OutsiderSystem {
           const action: AgentAction = {
             action: 'move',
             target: demon.state.name,
-            reasoning: `Approaching the Demon ${demon.state.name} to engage in combat.`,
+            reasoning: `Approaching the Entity ${demon.state.name} to engage in combat.`,
             emotionalState: 'determined',
             durationMinutes: 5,
           }
@@ -186,7 +186,43 @@ export class OutsiderSystem {
       return
     }
 
-    // 2. If no demon, patrol and investigate locations
+    // 2. If no demon, pursue any open lead on the cause of death that
+    // brought the Knight to town in the first place. Only fall back to
+    // aimless building patrol once there is nothing left to investigate.
+    const activeInvestigation = this.deps.activeBlocks.get(agent.state.id)
+    if (activeInvestigation?.action.action === 'investigate' && activeInvestigation.rumourId) {
+      return
+    }
+
+    const lead = [...this.deps.rumours.values()]
+      .reverse()
+      .find((rumour) =>
+        this.deps.isRumourUnresolved(rumour.id) &&
+        this.deps.isAgentUndecidedAboutRumour(agent.state.id, rumour.id) &&
+        this.deps.getInvestigationAuthority(agent, rumour) !== null
+      )
+
+    if (lead) {
+      const partnerId = agent.getConversationPartnerId()
+      if (partnerId) {
+        const partner = this.deps.getAgents().find((a) => a.state.id === partnerId)
+        if (partner) this.deps.conversationManager.closeConversation(agent, partner)
+      }
+
+      const action: AgentAction = {
+        action: 'investigate',
+        target: null,
+        reasoning: `Investigating the cause of death behind: ${lead.text}`,
+        emotionalState: 'determined',
+        durationMinutes: 30,
+      }
+      const authority = this.deps.getInvestigationAuthority(agent, lead) ?? 'criminal investigation into the cause of death'
+      this.deps.prepareInvestigationDecision(agent, action, lead, authority)
+      this.deps.startBlock(agent, action, [], lead.id, false)
+      return
+    }
+
+    // 3. No demon, no open lead -- patrol town buildings for anything new
     // Initialize patrol state if not present
     if (!agent.state.knightPatrol) {
       agent.state.knightPatrol = {
@@ -231,7 +267,7 @@ export class OutsiderSystem {
         const action: AgentAction = {
           action: 'investigate',
           target: nextBuilding.name,
-          reasoning: `Investigating ${nextBuilding.name} for any threats or anomalies.`,
+          reasoning: `Canvassing ${nextBuilding.name} for leads on the cause of death.`,
           emotionalState: 'determined',
           durationMinutes: 10,
         }

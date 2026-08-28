@@ -176,9 +176,9 @@ export class ReligionSystem {
 
   public createDemon(command: string): { success: boolean; message: string; demonId?: string } {
     const prompt = command.trim()
-    if (!prompt) return { success: false, message: 'Enter a command before creating the Demon.' }
+    if (!prompt) return { success: false, message: 'Enter a command before creating the Entity.' }
     if (this.deps.getAgents().some((agent) => agent.state.demon)) {
-      return { success: false, message: 'The unique Demon has already been created.' }
+      return { success: false, message: 'The unique Entity has already been created.' }
     }
     if (this.state.demonSummonCredits <= 0) {
       return { success: false, message: 'A cult of at least three living members must complete a summon ritual first.' }
@@ -192,7 +192,7 @@ export class ReligionSystem {
       name,
       this.deps.world,
       this.deps.simManager,
-      'Demon'
+      'Entity'
     )
     demon.state.demon = { createdAtMinute: this.deps.getAbsoluteMinute() }
     demon.state.maxHealth = 666
@@ -277,8 +277,8 @@ export class ReligionSystem {
       agent.state.alive && agent.state.demon && (!demonId || agent.state.id === demonId)
     )
     const prompt = command.trim()
-    if (!demon) return { success: false, message: 'The Demon is not alive.' }
-    if (!prompt) return { success: false, message: 'Enter a command for the Demon.' }
+    if (!demon) return { success: false, message: 'The Entity is not alive.' }
+    if (!prompt) return { success: false, message: 'Enter a command for the Entity.' }
 
     const target = this.deps.getAgents()
       .filter((agent) => agent.state.alive && agent.state.id !== demon.state.id)
@@ -433,7 +433,7 @@ export class ReligionSystem {
       const damage = previousHealth - target.state.health
       polarity = 'negative'
       description = damage === 0 && target.state.demon
-        ? `${deityName} attempted to smite ${target.state.name}, but the Demon was invulnerable because ${deityName} is not a Knight or Inquisitor outsider.`
+        ? `${deityName} attempted to smite ${target.state.name}, but a bound entity cannot be destroyed by any force, divine or mortal.`
         : `${deityName} answered the invocation by smiting ${target.state.name} for ${damage} damage${died ? ', killing them' : ''}.`
       factDescription = damage === 0 && target.state.demon
         ? `${target.state.name} felt a force strike at them and pass through, untouched.`
@@ -1881,14 +1881,14 @@ export class ReligionSystem {
         ? {
           action: 'attack',
           target: prey.state.name,
-          reasoning: `Unbidden, the Demon turns on ${prey.state.name} out of its own malice.`,
+          reasoning: `Unbidden, the Entity turns on ${prey.state.name} out of its own malice.`,
           emotionalState: 'angry',
           durationMinutes: 4,
         }
         : {
           action: 'move',
           target: prey.state.name,
-          reasoning: `The Demon stalks ${prey.state.name} of its own will, awaiting no command.`,
+          reasoning: `The Entity stalks ${prey.state.name} of its own will, awaiting no command.`,
           emotionalState: 'angry',
           durationMinutes: 12,
         }
@@ -1900,7 +1900,7 @@ export class ReligionSystem {
       const action: AgentAction = {
         action: 'move',
         target: null,
-        reasoning: 'Answering to nothing but its own hunger, the Demon roams the town.',
+        reasoning: 'Answering to nothing but its own hunger, the Entity roams the town.',
         emotionalState: 'neutral',
         durationMinutes: 10,
       }
@@ -1911,7 +1911,7 @@ export class ReligionSystem {
     const action: AgentAction = {
       action: 'rest',
       target: null,
-      reasoning: 'The Demon broods where it stands, indifferent to the town around it.',
+      reasoning: 'The Entity broods where it stands, indifferent to the town around it.',
       emotionalState: 'neutral',
       durationMinutes: 6,
     }

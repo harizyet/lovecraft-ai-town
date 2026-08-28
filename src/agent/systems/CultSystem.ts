@@ -1407,12 +1407,14 @@ export class CultSystem {
           delta.livingMembers = summoningMembers.length
           description = `${agent.state.name}'s summoning rite failed because ${cult.name} has only ${summoningMembers.length} living member${summoningMembers.length === 1 ? '' : 's'}; three are required.`
         } else {
+          const hadCredit = this.deps.getAgents().some((candidate) => candidate.state.demon) ||
+            this.deps.getDemonSummonCredits() >= 1
           const newDemonSummonCredits = this.deps.grantDemonSummonCredit(summonSite!)
           delta.requiredMembers = 3
           delta.livingMembers = summoningMembers.length
           delta.demonSummonCredits = newDemonSummonCredits
           delta.summonSite = summonSite
-          description = `${agent.state.name} gathered ${summoningMembers.length - 1} fellow members of ${cult.name} at ${action.target} and completed the summoning ritual, granting the user one Demon summon charge.`
+          description = `${agent.state.name} gathered ${summoningMembers.length - 1} fellow members of ${cult.name} at ${action.target} and completed the summoning ritual${hadCredit ? ', but the world can only ever bear one Entity, and that threshold has already been crossed' : ', granting the user the single, world-ending Entity summon charge'}.`
         }
         break
       }

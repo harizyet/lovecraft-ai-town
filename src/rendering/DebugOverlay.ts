@@ -250,20 +250,20 @@ export class DebugOverlay {
       </section>
       <section style="padding:10px;border:1px solid #5b2630;border-radius:6px;background:rgba(38,18,22,.94);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;color:#ef9a9a;">
-          <strong>Demon summon</strong>
+          <strong>Entity summon</strong>
           <div style="display:flex;align-items:center;gap:6px;">
-            <span id="demon-summon-count">0 charges</span>
-            <button id="demon-summon-toggle" aria-label="Expand demon summon" aria-expanded="false" style="border:0;border-radius:3px;background:#4a252a;color:#ddd;cursor:pointer;padding:3px 7px;">+</button>
+            <span id="demon-summon-count">not ready</span>
+            <button id="demon-summon-toggle" aria-label="Expand entity summon" aria-expanded="false" style="border:0;border-radius:3px;background:#4a252a;color:#ddd;cursor:pointer;padding:3px 7px;">+</button>
           </div>
         </div>
         <div id="demon-summon-content" style="display:none;">
           <div id="demon-summon-progress-label" style="margin:4px 0 3px;color:#bcaaa4;font-size:10px;">No summoning ritual active.</div>
-          <div role="progressbar" aria-label="Demon summoning progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="height:9px;background:#241316;border:1px solid #6d3038;border-radius:5px;overflow:hidden;">
+          <div role="progressbar" aria-label="Entity summoning progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="height:9px;background:#241316;border:1px solid #6d3038;border-radius:5px;overflow:hidden;">
             <div id="demon-summon-progress-fill" style="width:0%;height:100%;background:linear-gradient(90deg,#7f0000,#ff3d00);transition:width 160ms linear;"></div>
           </div>
-          <input id="demon-command-prompt" type="text" maxlength="240" placeholder="Command the unique Demon, e.g. attack Marcus River" style="box-sizing:border-box;width:100%;margin:4px 0 5px;padding:5px;background:#2b171a;color:#fff;border:1px solid #7f3540;border-radius:3px;">
+          <input id="demon-command-prompt" type="text" maxlength="240" placeholder="Command the unique Entity, e.g. attack Marcus River" style="box-sizing:border-box;width:100%;margin:4px 0 5px;padding:5px;background:#2b171a;color:#fff;border:1px solid #7f3540;border-radius:3px;">
           <div style="display:flex;gap:5px;">
-            <button data-demon-action="create" disabled style="padding:4px 8px;border:0;border-radius:3px;background:#4a252a;color:#8d6a6d;cursor:not-allowed;">Create Demon</button>
+            <button data-demon-action="create" disabled style="padding:4px 8px;border:0;border-radius:3px;background:#4a252a;color:#8d6a6d;cursor:not-allowed;">Create Entity</button>
             <button data-demon-action="command" disabled style="padding:4px 8px;border:0;border-radius:3px;background:#4a252a;color:#8d6a6d;cursor:not-allowed;">Issue Command</button>
           </div>
           <div id="demon-command-status" style="min-height:14px;margin-top:4px;color:#9e9e9e;font-size:10px;"></div>
@@ -280,7 +280,7 @@ export class DebugOverlay {
       window.dispatchEvent(new CustomEvent('debug-toggle-story-log'))
     })
     this.setupMinimisableSection(panel, 'god-abilities-toggle', 'god-abilities-content', 'deity abilities')
-    this.setupMinimisableSection(panel, 'demon-summon-toggle', 'demon-summon-content', 'demon summon')
+    this.setupMinimisableSection(panel, 'demon-summon-toggle', 'demon-summon-content', 'entity summon')
     panel.addEventListener('click', (event) => {
       const demonButton = event.target instanceof Element
         ? event.target.closest<HTMLButtonElement>('[data-demon-action]')
@@ -402,7 +402,14 @@ export class DebugOverlay {
       button.style.color = button.disabled ? '#8d8469' : '#1b1607'
     }
     const demonCount = this.controlsPanel.querySelector<HTMLElement>('#demon-summon-count')
-    if (demonCount) demonCount.textContent = `${state.demonSummonCredits} charge${state.demonSummonCredits === 1 ? '' : 's'}`
+    if (demonCount) {
+      demonCount.textContent = state.demons.length > 0
+        ? 'manifested'
+        : state.demonSummonCredits > 0
+          ? 'ready — world-ending'
+          : 'not ready'
+      demonCount.style.color = state.demons.length > 0 || state.demonSummonCredits > 0 ? '#ff5252' : '#bcaaa4'
+    }
     const progressLabel = this.controlsPanel.querySelector<HTMLElement>('#demon-summon-progress-label')
     const progressFill = this.controlsPanel.querySelector<HTMLElement>('#demon-summon-progress-fill')
     const progressBar = progressFill?.parentElement
@@ -417,7 +424,7 @@ export class DebugOverlay {
         : state.demons.length > 0
           ? `${state.demons[0].name} has manifested.`
           : state.demonSummonCredits > 0
-            ? 'Ritual complete — Demon ready to manifest.'
+            ? 'Ritual complete — Entity ready to manifest.'
             : 'No summoning ritual active.'
     }
     for (const button of this.controlsPanel.querySelectorAll<HTMLButtonElement>('[data-demon-action]')) {
@@ -1342,7 +1349,7 @@ export class DebugOverlay {
     const roleBadges = this.renderAgentRoleBadges(agent, true)
     body.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;">
-        ${this.detailSection('State', `${roleBadges ? `Role markers: ${roleBadges}<br>` : ''}Status: ${agent.exiled ? 'EXILED' : agent.alive ? 'alive' : 'DEAD'}<br>${agent.exiled ? `Exiled: ${this.formatAbsoluteMinute(agent.exiled.atMinute)}<br>Reason: ${this.escapeHtml(agent.exiled.reason)}<br>` : ''}${agent.demon ? `Demon command: ${this.escapeHtml(agent.demon.lastCommand ?? 'none')}<br>` : ''}${agent.permanentInsanity ? `<span style="color:#ef9a9a;font-weight:bold;">Permanent insanity</span>: ${this.escapeHtml(agent.permanentInsanity.reason)}<br>Onset: ${this.formatAbsoluteMinute(agent.permanentInsanity.causedAtMinute)}<br>` : ''}${agent.dream ? `<span style="color:${agent.dream.isNightmare ? '#ef9a9a' : '#ce93d8'};font-weight:bold;">${agent.dream.isNightmare ? 'Nightmare' : 'Dream'}</span> (${agent.dream.plantedBy}): ${this.escapeHtml(agent.dream.biasText)}<br>` : ''}${agent.existentialState ? `Existential reaction: <span style="font-weight:bold;">${this.escapeHtml(agent.existentialState.reaction)}</span>${agent.existentialState.reinterpretationFrame ? ` (${this.escapeHtml(agent.existentialState.reinterpretationFrame)})` : ''}<br>` : ''}${agent.obsession ? `Obsession evidence: ${agent.obsession.evidenceCount} (${this.escapeHtml(agent.obsession.evidenceLog.slice(-1)[0] ?? 'watching closely')})<br>` : ''}Emotion: ${this.escapeHtml(this.getEmotionLabel(agent.emotionalState))}<br>Activity: ${this.escapeHtml(this.latestActivityStatuses[agentId] ?? 'unknown')}<br>LLM: ${this.escapeHtml(this.latestLLMStatuses[agentId] ?? 'idle')}<br>Last position: (${Math.round(agent.position.x)}, ${Math.round(agent.position.y)})<br>Job: ${this.escapeHtml(agent.currentJob ?? 'None')}<br>Reputation: ${Math.round(agent.reputation)}/100<br>Wealth: ${Math.round(agent.wealth)}/100<br>Political camp: ${this.escapeHtml(agent.politicalCamp?.name ?? 'unaffiliated')}`)}
+        ${this.detailSection('State', `${roleBadges ? `Role markers: ${roleBadges}<br>` : ''}Status: ${agent.exiled ? 'EXILED' : agent.alive ? 'alive' : 'DEAD'}<br>${agent.exiled ? `Exiled: ${this.formatAbsoluteMinute(agent.exiled.atMinute)}<br>Reason: ${this.escapeHtml(agent.exiled.reason)}<br>` : ''}${agent.demon ? `Entity command: ${this.escapeHtml(agent.demon.lastCommand ?? 'none')}<br>` : ''}${agent.permanentInsanity ? `<span style="color:#ef9a9a;font-weight:bold;">Permanent insanity</span>: ${this.escapeHtml(agent.permanentInsanity.reason)}<br>Onset: ${this.formatAbsoluteMinute(agent.permanentInsanity.causedAtMinute)}<br>` : ''}${agent.dream ? `<span style="color:${agent.dream.isNightmare ? '#ef9a9a' : '#ce93d8'};font-weight:bold;">${agent.dream.isNightmare ? 'Nightmare' : 'Dream'}</span> (${agent.dream.plantedBy}): ${this.escapeHtml(agent.dream.biasText)}<br>` : ''}${agent.existentialState ? `Existential reaction: <span style="font-weight:bold;">${this.escapeHtml(agent.existentialState.reaction)}</span>${agent.existentialState.reinterpretationFrame ? ` (${this.escapeHtml(agent.existentialState.reinterpretationFrame)})` : ''}<br>` : ''}${agent.obsession ? `Obsession evidence: ${agent.obsession.evidenceCount} (${this.escapeHtml(agent.obsession.evidenceLog.slice(-1)[0] ?? 'watching closely')})<br>` : ''}Emotion: ${this.escapeHtml(this.getEmotionLabel(agent.emotionalState))}<br>Activity: ${this.escapeHtml(this.latestActivityStatuses[agentId] ?? 'unknown')}<br>LLM: ${this.escapeHtml(this.latestLLMStatuses[agentId] ?? 'idle')}<br>Last position: (${Math.round(agent.position.x)}, ${Math.round(agent.position.y)})<br>Job: ${this.escapeHtml(agent.currentJob ?? 'None')}<br>Reputation: ${Math.round(agent.reputation)}/100<br>Wealth: ${Math.round(agent.wealth)}/100<br>Political camp: ${this.escapeHtml(agent.politicalCamp?.name ?? 'unaffiliated')}`)}
         ${this.detailSection('Needs and health', `HP: ${Math.round(agent.health)}/${Math.round(agent.maxHealth)}<br>Hunger: ${Math.round(agent.needs.hunger)}/100<br>Energy: ${Math.round(agent.needs.energy)}/100<br>Social: ${Math.round(agent.needs.social)}/100<br>Sanity: <span style="color:${agent.sanity <= 40 ? '#ef9a9a' : agent.sanity <= 70 ? '#ffcc80' : '#a5d6a7'};">${Math.round(agent.sanity)}/100</span><br>Inventory: ${inventory}`)}
         ${this.detailSection('Personality', `${this.renderPersonality(agent)}<br><span style="color:#90a4ae;">Aggression affects confrontation; friendliness cooperation; curiosity investigation; caution safety; ambition leadership; creativity improvisation.</span>`)}
         ${this.detailSection('Beliefs and affiliations', (agent.demon ? 'Worldview: none<br>Faith: none<br>Deities: none<br>Cult: none' : agent.religiousStanceRevealed === false && (agent.beliefSystem.religiousStance === 'atheist' || agent.beliefSystem.religiousStance === 'nonbeliever') ? `Worldview: undisclosed<br>Faith: hidden<br>Deities: hidden<br>Cult: ${agent.cult ? `${this.escapeHtml(agent.cult.name)} (${this.escapeHtml(agent.cult.role)})` : 'none'}` : `Worldview: ${this.escapeHtml(agent.beliefSystem.religiousStance)}<br>Faith: ${Math.round(agent.beliefSystem.faith)}/100<br>Deities: ${agent.beliefSystem.deities.map((deity) => `${this.escapeHtml(deity.name)} ${Math.round(deity.confidence)}%`).join(', ') || 'none'}<br>Cult: ${agent.cult ? `${this.escapeHtml(agent.cult.name)} (${this.escapeHtml(agent.cult.role)})` : 'none'}`) + (agent.alderman ? `<br>Office: <strong style="color:#ffd54f;">Village Alderman</strong> (${this.escapeHtml(agent.alderman.cultName)}) — binding control over court verdicts and assembly votes` : ''))}
@@ -1416,7 +1423,7 @@ export class DebugOverlay {
     if (agent.demon) {
       markers.push({
         icon: '☠',
-        label: 'User-commanded Demon',
+        label: 'User-commanded Entity',
         color: '#ffcdd2',
         background: '#4a1118',
         border: '#c62828',

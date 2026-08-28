@@ -223,6 +223,7 @@ export interface SystemDeps {
   queuePropheticInterpretation(agent: Agent, rumour: Rumour, deityName: string, eventId?: string): void
   applyResurrectionInsanity(target: Agent, sourceName: string, includeExecuteVoterInsanity: boolean): number
   getProphetAgentId(): string | null
+  getDemonSummonCredits(): number
   grantDemonSummonCredit(site: { x: number; y: number }): number
 
   // Relic subsystem (RelicSystem.ts) -- called once a rumour investigation

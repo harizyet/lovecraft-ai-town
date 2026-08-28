@@ -37,7 +37,7 @@ export class RelicSystem {
     if (Math.random() >= RELIC_CREATION_CHANCE) return
 
     const priorForbiddenKnowledge = (agent.state.forbiddenKnowledge?.length ?? 0) > 0
-    const cultRelated = /cult|cultist|sect|ritual|forbidden rite|hidden shrine|hooded|heretic|demon|god|deity/i.test(rumour.text)
+    const cultRelated = /cult|cultist|sect|ritual|forbidden rite|hidden shrine|hooded|heretic|demon|entity|god|deity/i.test(rumour.text)
     const forbiddenChance = FORBIDDEN_CONTENT_CHANCE_BASE +
       (priorForbiddenKnowledge ? 0.3 : 0) +
       (cultRelated ? 0.15 : 0)

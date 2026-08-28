@@ -28,7 +28,7 @@ ai-town/
 │   │   ├── [AgentManager.ts](file:///home/hariz/village/ai-town/src/agent/AgentManager.ts)            # Thin orchestrator: wiring, main loop, snapshot save/restore (1319 lines)
 │   │   └── systems/                   # Extracted modular subsystems (12 systems + shared DI interface)
 │   │       ├── [RumourSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/RumourSystem.ts)        # Propagation, credibility, corroboration, investigation (2124 lines)
-│   │       ├── [CultSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/CultSystem.ts)          # Shrines, demonic summoning, cult mechanics, targeted preaching (2145 lines)
+│   │       ├── [CultSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/CultSystem.ts)          # Shrines, entity summoning, cult mechanics, targeted preaching (2145 lines)
 │   │       ├── [ReligionSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/ReligionSystem.ts)      # Faith, prophets, revelations, deity chat (1834 lines)
 │   │       ├── [JusticeSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/JusticeSystem.ts)       # Resolution courts, trials, voting, belief-consistent verdicts (975 lines)
 │   │       ├── [PoliticalSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/PoliticalSystem.ts)     # Gentry/Commons camps, town policy voting, Alderman, bribery (899 lines)
@@ -37,7 +37,7 @@ ai-town/
 │   │       ├── [SocialSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/SocialSystem.ts)        # Encounters, conversation batching & context (430 lines)
 │   │       ├── [OutsiderSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/OutsiderSystem.ts)      # Knight/Inquisitor spawning & combat (270 lines)
 │   │       ├── [StorySystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/StorySystem.ts)         # Narrates major story moments & events, incl. survivor/extinction beats (287 lines)
-│   │       ├── [EnvironmentSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/EnvironmentSystem.ts)   # Localized tile corruption from cult shrines, demons & rituals; map-wide demon saturation
+│   │       ├── [EnvironmentSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/EnvironmentSystem.ts)   # Localized tile corruption from cult shrines, entities & rituals; map-wide entity saturation
 │   │       ├── [RelicSystem.ts](file:///home/hariz/village/ai-town/src/agent/systems/RelicSystem.ts)         # Forbidden relic creation, discovery & deity relic placement
 │   │       ├── [SchemeValidator.ts](file:///home/hariz/village/ai-town/src/agent/systems/SchemeValidator.ts)    # Validates LLM-proposed Cult Scheme output against job affordances
 │   │       └── [SystemDeps.ts](file:///home/hariz/village/ai-town/src/agent/systems/SystemDeps.ts)          # Shared dependency-injection interface between systems (280 lines)
@@ -88,7 +88,7 @@ main.ts
               ├── AStarPathfinder (pathfinding)
               └── Systems (agent/systems/*.ts — talk to each other only through SystemDeps)
                     ├── RumourSystem (Rumour spread, credibility, corroboration, investigation)
-                    ├── CultSystem (Summoning rites, shrines, demonic targeting, mob tracking)
+                    ├── CultSystem (Summoning rites, shrines, entity targeting, mob tracking)
                     ├── ReligionSystem (Faith levels, Prophet revelations, deity chat commands)
                     ├── JusticeSystem (Resolution Court trials, voter defense speeches, verdicts)
                     ├── PoliticalSystem (Gentry vs. Commons camps, policy town assemblies)
@@ -97,7 +97,7 @@ main.ts
                     ├── SocialSystem (Encounters, conversation batching)
                     ├── OutsiderSystem (Knight/Inquisitor spawning & combat)
                     ├── StorySystem (Chronicles major town events, alerts, and narrations)
-                    ├── EnvironmentSystem (Localized tile corruption from cult/demon/ritual activity)
+                    ├── EnvironmentSystem (Localized tile corruption from cult/entity/ritual activity)
                     └── RelicSystem (Forbidden relic creation, discovery & deity relic placement)
 ```
 
@@ -138,15 +138,15 @@ references to the other eleven systems.
 | 20 | **Rumour propagation** | `RumourSystem.ts` | Rumour seeding, spreading in conversation, thought creation, credibility tracking |
 | 21 | **Divine Whispers & Chat** | `DeityChatPanel.ts`, `ReligionSystem.ts` | Allow the user to act as a deity, whisper commands to agents, and chat directly |
 | 22 | **Prophets & Revelations** | `ReligionSystem.ts` | Prophet role transitions, daily prophetic tasks (sacrifices, warn, convert) |
-| 23 | **Cults & Summoning** | `CultSystem.ts` | Founding cults, naming congregations, gathering sum-charge to summon invulnerable Demons |
+| 23 | **Cults & Summoning** | `CultSystem.ts` | Founding cults, naming congregations, gathering sum-charge to summon unkillable Entities |
 | 24 | **Sanity & Corruption** | `ReligionSystem.ts`, `CultSystem.ts` | Permanent insanity behavior from existential shock, Priest corruption into hidden cultist |
 | 25 | **Resolution Courts** | `JusticeSystem.ts`, `CourtPanel.ts` | Trial assemblies, LLM voter defenses, voting to Absolve, Exile, or Execute |
 | 26 | **Political Camps** | `PoliticalSystem.ts`, `PolicyPanel.ts` | Division of town into Gentry/Commons; town assemblies to vote on economic/exile policies |
 | 27 | **Office of the Alderman** | `PoliticalSystem.ts` | Reaching unanimous cult town conversion triggers election, granting decree power |
-| 28 | **Outsider Escalation** | `OutsiderSystem.ts` | Spawn Knights (investigating death) and Inquisitors (combating cults) |
+| 28 | **Outsider Escalation** | `OutsiderSystem.ts` | Spawn Knights (investigating cause of death) and Inquisitors (investigating cult activity) |
 | 29 | **Story Narration HUD** | `StorySystem.ts`, `StoryNarrationPanel.ts` | Visual log detailing major town narrative milestones |
 | 30 | **Vocation Systems & Idle Watchdog** | `Agent.ts`, `ScheduleSystem.ts` | stuck/idle watchdog triggering `idle_recovery` behavior |
-| 31 | **Environmental Decay & Weather Corruption** | `EnvironmentSystem.ts`, `Renderer.ts` | Cult shrines/demons/rituals spread localized, reversible tile corruption: brackish water, blighted crops, persistent fog |
+| 31 | **Environmental Decay & Weather Corruption** | `EnvironmentSystem.ts`, `Renderer.ts` | Cult shrines/entities/rituals spread localized, reversible tile corruption: brackish water, blighted crops, persistent fog |
 | 32 | **Eldritch Blight** | `EnvironmentSystem.ts`, `types/index.ts` | Sustained high corruption permanently converts a GRASS/WATER tile's actual `TileType` into `BLIGHTED`/`BRACKISH_WATER` -- a lasting scar that outlives the corrupting source, unlike the reversible tint above |
 | 33 | **Dreamscape (planted & spontaneous nightmares)** | `ReligionSystem.ts`, `ScheduleSystem.ts`, `PromptBuilder.ts` | Deity ability plants a bias/nightmare into a sleeping, cult-unaligned villager's mind; the same villagers can also spontaneously nightmare on their own, odds scaled by town corruption and low sanity. Surfaces in reasoning and conversation, fades on next sleep |
 | 34 | **Create Forbidden Relic deity ability** | `RelicSystem.ts`, `SimulationManager.ts`, `Renderer.ts`, `DebugOverlay.ts` | Deity ability to write and place a custom forbidden relic directly on the map. Unbelievers of the relic's associated deity gain the knowledge but face an 80% chance of immediate permanent insanity, unless shielded by cult conviction. |
@@ -154,9 +154,10 @@ references to the other eleven systems.
 | 36 | **Belief-Consistent Court Sentencing** | `JusticeSystem.ts` | Non-cultist voters cannot vote to punish an accusation they don't believe, and execution requires firm, high-confidence belief in a genuinely grave claim, otherwise the vote is downgraded to exile |
 | 37 | **Low-Health Recovery** | `ScheduleSystem.ts` | Below 50 HP, an agent is compelled toward the apothecary once sleep/hunger needs are met, latching into recovery mode until fully healed; the exhaustion-sleep safety net no longer excludes insane agents |
 | 38 | **Extended Cult Conviction Immunity** | `RelicSystem.ts`, `RumourSystem.ts` | Sanity-shielding from forbidden-knowledge revelations (rumours and relics alike) now covers every cultist — secret prophets, leaders, and rank-and-file members — not just leadership |
-| 39 | **Alderman Political Fixes & Outsider/Relic Narration** | `PoliticalSystem.ts`, `OutsiderSystem.ts`, `AgentManager.ts`, `RelicSystem.ts`, `EnvironmentSystem.ts`, `StorySystem.ts` | Gentry voters lean against any village-funded policy spend by default; a deity-placed relic now fires its own `deity_relic_created` moment distinct from an organically-written one; Knight/Inquisitor arrivals and deaths, and an Alderman's naming, are chronicled; a successful Demon summon now instantly saturates the whole map's corruption to maximum |
+| 39 | **Alderman Political Fixes & Outsider/Relic Narration** | `PoliticalSystem.ts`, `OutsiderSystem.ts`, `AgentManager.ts`, `RelicSystem.ts`, `EnvironmentSystem.ts`, `StorySystem.ts` | Gentry voters lean against any village-funded policy spend by default; a deity-placed relic now fires its own `deity_relic_created` moment distinct from an organically-written one; Knight/Inquisitor arrivals and deaths, and an Alderman's naming, are chronicled; a successful Entity summon now instantly saturates the whole map's corruption to maximum |
 | 40 | **Survivor Composition & Cult Extinction Story Beats** | `StorySystem.ts`, `AgentManager.ts` | Ticked every update: narrates once when every living villager belongs to a cult, once if a cult leader ends up the sole living survivor, and once when every cult that ever existed in the game has died out |
 | 41 | **Cult Schemes** | `CultSystem.ts`, `SchemeValidator.ts`, `RelicSystem.ts`, `Agent.ts`, `PromptBuilder.ts`, `AIProvider.ts`, `SystemDeps.ts` | An LLM proposes a job-flavored covert scheme (which mechanical primitive, `relic_exposure` or `conversion_influence`, and a `subtle`/`moderate`/`bold` risk posture) for each of all 9 jobs' cult leaders once per simulated day; a validator rejects anything the leader's vocation doesn't afford (`JOB_AFFORDANCES`); the engine alone computes actual potency from the leader's ambition/faith/cult size/reputation, capped by the chosen risk; the leader then physically travels to their job building and holds a visible multi-minute "preparing" activity before the scheme actually executes, during which a nearby Priest/Town Guard/Inquisitor has a small chance to notice and seed an ordinary rumour naming them; execution reuses the existing relic-creation and conversion-progress mutators, so discovery/counterplay is free via the existing Forbidden Relic and investigation pipelines |
+| 42 | **Unkillable Entity & Knight/Inquisitor as Investigators** | `Agent.ts`, `AgentInteraction.ts`, `ReligionSystem.ts`, `OutsiderSystem.ts`, `RumourSystem.ts` | Per Lovecraftian lore, a bound Entity can no longer be destroyed by combat under any circumstances — the prior Knight/Inquisitor exception to `takeDamage`'s demon shield is removed, so instant-kills, divine smiting, and even Knight/Inquisitor attacks always deal zero damage. Knights and Inquisitors are reframed as investigators rather than monster hunters: a Knight now has standing investigative authority (via `getInvestigationAuthority`) over unresolved death-related rumours and, once one exists, drives the same interview/finding pipeline ordinary villagers use instead of aimlessly patrolling buildings; an Inquisitor already had equivalent authority over cult-related rumours. Both will still engage an Entity on sight and fight indefinitely, but the fight can never end in its death. |
 
 ### Partially Implemented / Simplified
 
@@ -315,8 +316,8 @@ The event queues an LLM reaction for affected agents
 ### Cults & Shrines Subsystem (`CultSystem.ts`)
 - Cult leaders recruit members (`form_cult`), who gain specialized tasks (`pray`, `heal`, `bless`, `curse`, `resurrect`).
 - Leaders deterministically build physical shrines near them, directing cult sermons and rites to that preferred location.
-- **Demonic Summoning** — Cult leaders lead collective summoning rites, gathering fellow members to generate a Demon summon charge. Summoned Demons are invulnerable (666 HP, ignoring ordinary damage) and pursue user-defined attack or travel commands.
-- **Permanent Insanity** — Witnessing Demon manifestations or targeted divine actions can drive non-cultist/nonbelieving agents permanently insane, forcing panicked and erratic behaviors that persist through saves and reloads.
+- **Entity Summoning** — Cult leaders lead collective summoning rites, gathering fellow members to generate an Entity summon charge. Per Lovecraftian lore, a summoned Entity can never be destroyed by combat — not by instant-kills, divine smiting, court execution, or a Knight/Inquisitor's attacks — and instead pursues user-defined attack or travel commands.
+- **Permanent Insanity** — Witnessing Entity manifestations or targeted divine actions can drive non-cultist/nonbelieving agents permanently insane, forcing panicked and erratic behaviors that persist through saves and reloads.
 - **Corruption Twists** — Direct whispers to a Priest can corrupt them, making them a hidden Prophet/cult leader. They rename their congregation to evoke ancient, inhuman deities while retaining their public Priest facade to avoid suspicion.
 - **Defection & Mobs** — Disillusioned members defect, becoming enemies of their former cult and potentially forming anti-cult groups. High-aggression cults can form mobs to hunt down and attack nonbelievers.
 
@@ -332,7 +333,7 @@ The event queues an LLM reaction for affected agents
 - Gentry voters no longer lean toward supporting a wealth policy just because it favors Merchant/Steward trades — every wealth policy spends the village's funds, and the Gentry campLean is now a flat -0.4 against it regardless of beneficiary, with direct self-interest (the voter's own job matching the target job) as the remaining route to Gentry support.
 
 ### Story Narration Subsystem (`StorySystem.ts`)
-- Chronicles major town events and milestones (cult formation, prophet appointments, demonic summons, trials, Alderman elections, outsider arrivals/deaths, deity relic manifestations, etc.).
+- Chronicles major town events and milestones (cult formation, prophet appointments, entity summons, trials, Alderman elections, outsider arrivals/deaths, deity relic manifestations, etc.).
 - Feeds these moments to a custom UI panel (`StoryNarrationPanel`) for visual display and narrative tracking.
 - `checkSurvivorComposition` and `checkCultExtinction` run every tick off `AgentManager`'s living-agent list rather than off any single death/exile event, since an agent can stop being alive through many separate paths (combat, starvation, suicide, execution, exile, sacrifice). Each narrates once per game: every living villager belonging to a cult (`only_cultists_survive`), a cult leader left as the sole living survivor (`cult_leader_sole_survivor`), and every cult that ever existed in the game having gone extinct (`cults_extinguished`, gated on a cult having actually existed at some point so a fresh village doesn't narrate its own absence).
 
@@ -351,17 +352,18 @@ The event queues an LLM reaction for affected agents
 - Detects agent-to-agent encounters, batches/pre-generates conversation turns, and builds the contextual dialogue (including rumour mentions) fed to the LLM for a conversation turn.
 
 ### Outsider Subsystem (`OutsiderSystem.ts`)
-- Spawns and drives Knights (arrive after repeated deaths) and Inquisitors (arrive when a Priest confirms multiple cultists), including their patrol/pursuit/combat behavior once in the world.
+- Spawns and drives Knights (arrive after repeated deaths) and Inquisitors (arrive when a Priest confirms multiple cultists). Both are fundamentally investigators, not monster hunters, and will confront but can never destroy an Entity (see `takeDamage`'s unconditional demon shield in `Agent.ts`).
+- `updateKnightPatrolAndCombat` gives the hardcoded (non-LLM) Knight three priorities each tick: (1) if an Entity is within 8 tiles, close in and attack it indefinitely — the fight can never end in the Entity's death; (2) otherwise, if any unresolved rumour matches `getInvestigationAuthority`'s death-related keywords for the `Knight` job (`RumourSystem.ts`), drive it through the same `prepareInvestigationDecision`/`advanceRumourInvestigations`/`completeRumourInvestigation` interview pipeline ordinary villagers use for their own rumours, reaching a verified/unsubstantiated finding; (3) with no open lead, fall back to patrolling town buildings for new anomalies. An Inquisitor needs no equivalent hardcoded loop — being LLM-driven, it already receives investigative authority over cult-related rumours the same way a Priest does.
 - Each arrival fires its own `knight_called`/`inquisitor_called` Story Narration moment. `AgentManager.handleOutsiderKilled` listens on the same `attack`-death event `handleCultLeaderKilled` already watches and fires `knight_killed`/`inquisitor_killed` when the victim is a living outsider, rather than threading a story-moment call through every kill path (combat, sacrifice) that could end an outsider's life.
 
 ### Environment Subsystem (`EnvironmentSystem.ts`)
-- Ticks once per simulated minute, collecting active corruption sources — cult shrines (scaled by living membership; a corrupted Priest's congregation anchors on its rededicated church instead, since that cult never builds a separate `CULT_SHRINE`), living Demons (strongest, moves with them), and in-progress summoning rituals — and spreads a decaying 0..1 corruption value into a sparse map of nearby tiles with distance falloff.
+- Ticks once per simulated minute, collecting active corruption sources — cult shrines (scaled by living membership; a corrupted Priest's congregation anchors on its rededicated church instead, since that cult never builds a separate `CULT_SHRINE`), living Entities (strongest, moves with them), and in-progress summoning rituals — and spreads a decaying 0..1 corruption value into a sparse map of nearby tiles with distance falloff.
 - Mirrors the current value directly onto `World.tiles[y][x].corruption` (rendered by `Renderer.ts` as a tint plus, past a heavier threshold, a persistent localized fog), so it persists for free through the existing tile save/load path; a small amount of bookkeeping state (which tiles have already been narrated) is snapshotted separately by `AgentManager`.
 - Fires a one-time `land_corrupted` event and Story Narration moment the first time a water tile turns brackish or a farm's crop fails; other corrupted tiles remain visually affected without their own discrete event.
-- Corruption only grows near an active source and decays back to zero once nothing sustains it, so the transient tint is a reversible, visible consequence of cult/demon activity rather than permanent world damage.
+- Corruption only grows near an active source and decays back to zero once nothing sustains it, so the transient tint is a reversible, visible consequence of cult/entity activity rather than permanent world damage.
 - **Eldritch Blight**: a GRASS/WATER tile that stays at or above `BLIGHT_THRESHOLD` for `BLIGHT_SUSTAIN_MINUTES` straight simulated minutes permanently converts its actual `TileType` to `BLIGHTED`/`BRACKISH_WATER` -- this survives the transient corruption value later decaying to zero, and the first such conversion ever fires its own `eldritch_blight` Story Narration moment distinct from `land_corrupted`.
 - `advanceCorruption()` gates on `Math.floor(getAbsoluteMinute())`, not the raw value -- `SimulationManager.updateDayNight` advances simulated time as a continuously-changing float every frame, so comparing the unfloored value would make the "once per simulated minute" throttle (and therefore every rate constant tuned against it) fire on nearly every frame instead.
-- **Map-Wide Demon Saturation** (`saturateWholeMap`) — the moment a bound Demon manifests (`ReligionSystem.summonDemon`, via `SystemDeps.saturateMapCorruption`), every tile on the map is slammed to full (1.0) corruption instantly, rather than letting corruption crawl outward from the summoning site at the usual `GROWTH_RATE`. Tiles outside the Demon's own `DEMON_RADIUS` still decay back down over time via the normal `advanceCorruption` loop once nothing else touches them — this only guarantees the map-wide shock of the manifestation itself.
+- **Map-Wide Entity Saturation** (`saturateWholeMap`) — the moment a bound Entity manifests (`ReligionSystem.summonDemon`, via `SystemDeps.saturateMapCorruption`), every tile on the map is slammed to full (1.0) corruption instantly, rather than letting corruption crawl outward from the summoning site at the usual `GROWTH_RATE`. Tiles outside the Entity's own `DEMON_RADIUS` still decay back down over time via the normal `advanceCorruption` loop once nothing else touches them — this only guarantees the map-wide shock of the manifestation itself.
 
 ### Relic Subsystem (`RelicSystem.ts`)
 - When `RumourSystem.completeRumourInvestigation` finishes (any investigation, verified or not), there is a flat 16% chance (`RELIC_CREATION_CHANCE`) the investigator pens their findings into a `ForbiddenRelic` (`World.relics`, keyed by id, rendered on the map as a diamond marker and persisted for free through the existing world save/load path) instead of the finding simply living on the rumour. A relic created this way fires a `forbidden_relic_created` Story Narration moment.

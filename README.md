@@ -26,10 +26,10 @@ Inspired by the research paper [Generative Agents: Interactive Simulacra of Huma
 * **Prophets & Divine Revelations** — The first agent to accept a direct divine whisper changes their vocation to a **Prophet**. They receive daily LLM-generated prophetic revelations, command executable tasks (e.g., sacrifice, warn, convert), and found cults.
 * **Faith & Atheism** — Agents track faith levels and deity confidence. The town begins with at least one atheist (capped faith) who resists preaching/recruitment, while others can convert, grow in faith, or lose faith.
 
-### 👿 Cults, Rituals & Demonic Forces
+### 👿 Cults, Rituals & Eldritch Forces
 * **Cult Mechanics & Shrines** — Cult leaders recruit members (`form_cult`), who gain specialized tasks (`pray`, `heal`, `bless`, `curse`, `resurrect`). Leaders deterministicly build physical shrines near them, directing cult sermons and rites to that preferred location.
-* **Demonic Summoning** — Cult leaders lead collective summoning rites, gathering fellow members to generate a Demon summon charge. Summoned Demons are invulnerable (666 HP, ignoring ordinary damage) and pursue user-defined attack or travel commands.
-* **Permanent Insanity** — Witnessing Demon manifestations or targeted divine actions can drive non-cultist/nonbelieving agents permanently insane, forcing panicked and erratic behaviors that persist through saves and reloads.
+* **Entity Summoning** — Cult leaders lead collective summoning rites, gathering fellow members to generate an Entity summon charge. In keeping with the setting's Lovecraftian lore, a summoned Entity can never be destroyed by combat — not by instant-kill rolls, divine smiting, court execution, or even a Knight or Inquisitor — and pursues user-defined attack or travel commands instead.
+* **Permanent Insanity** — Witnessing Entity manifestations or targeted divine actions can drive non-cultist/nonbelieving agents permanently insane, forcing panicked and erratic behaviors that persist through saves and reloads.
 * **Corruption Twists** — Direct whispers to a Priest can corrupt them, making them a hidden Prophet/cult leader. They rename their congregation to evoke ancient, inhuman deities while retaining their public Priest facade to avoid suspicion.
 * **Defection & Mobs** — Disillusioned members defect, becoming enemies of their former cult and potentially forming anti-cult groups. High-aggression cults can form mobs to hunt down and attack nonbelievers.
 * **Dreamscape** — A gated Deity ability lets the player reach into a sleeping, cult-unaligned villager's mind and plant a dream or nightmare, with lower sanity raising the odds it curdles into the latter. The same unaffiliated villagers can also nightmare on their own, odds rising with the town's ambient corruption — either way it colors the villager's private reasoning and gets brought up unprompted in their next conversation, then fades once they sleep again.
@@ -38,26 +38,26 @@ Inspired by the research paper [Generative Agents: Interactive Simulacra of Huma
 * **Cult Schemes** — Once per simulated day, a cult leader may devise a covert scheme that uses their own trade as cover: a farmer's tainted grain, a carpenter's hidden idol, a merchant's marked trinket, a priest's consecrated relic. An LLM only ever chooses *what kind* of tactic (plant a relic, or quietly sway nearby villagers) and *how bold* a posture to take — the engine alone determines actual potency from the leader's ambition, faith, cult size, and reputation, capped by that risk choice. The scheme isn't instant: the leader physically travels to their job building and visibly holds a multi-minute "preparing" activity there before it takes effect, giving a nearby Priest, Town Guard, or Inquisitor a small chance to notice something amiss and seed an ordinary rumour naming them — feeding the same investigation/court pipeline as any other suspicion. A planted object becomes an ordinary Forbidden Relic, so it's discovered and reacted to through the same mechanic as any other relic; a validator rejects any scheme a leader's vocation doesn't plausibly afford, with a job-flavored fallback scheme if the LLM fails twice.
 
 ### 🌫️ Environmental Decay & Weather Corruption
-* **Localized Corruption Field** — Cult shrines, bound Demons, and active summoning rituals bleed a spreading, decaying corruption value into nearby tiles, giving the otherwise-static world a visible, localized consequence of the social world's own corruption.
+* **Localized Corruption Field** — Cult shrines, bound Entities, and active summoning rituals bleed a spreading, decaying corruption value into nearby tiles, giving the otherwise-static world a visible, localized consequence of the social world's own corruption.
 * **Brackish Water & Blighted Crops** — Water tiles crossing a corruption threshold turn foul and brackish; farm buildings crossing it have their fields blacken and fail. Both are narrated as one-time events the first time they occur.
 * **Persistent Fog** — Heavily corrupted tiles are rendered with a lingering, ambient fog overlay distinct from the global weather system.
-* **Reversible Tint, Permanent Blight** — The transient tint/fog only grows near an active source and heals once a shrine loses its congregation or a Demon is gone, but **Eldritch Blight** is forever: a grass or water tile that sits at sufficiently high corruption for a sustained stretch of simulated time permanently converts into anomalous, blighted ground or brackish water, becoming a lasting scar on the map that outlasts whatever caused it.
+* **Reversible Tint, Permanent Blight** — The transient tint/fog only grows near an active source and heals once a shrine loses its congregation or an Entity is gone, but **Eldritch Blight** is forever: a grass or water tile that sits at sufficiently high corruption for a sustained stretch of simulated time permanently converts into anomalous, blighted ground or brackish water, becoming a lasting scar on the map that outlasts whatever caused it.
 
 ### ⚖️ Justice & Politics
 * **Resolution Courts** — When a rumour reaches everyone in town (or an authority override triggers), the village gathers at the town square for a trial. The accused delivers an LLM defense, and villagers vote to **Absolve**, **Exile** (inactive/hidden state), or **Execute** (permanent death).
 * **Political Camps (Gentry vs. Commons)** — Agents are split into wealth-ranked political camps. A Steward or high-reputation villager periodically calls town assemblies to vote on economic policies (boosting specific jobs with wealth) or banishing Knights/Inquisitors.
 * **Office of the Alderman** — If a cult leader converts the entire village, they can run for Alderman (requiring a unanimous vote). Seating them grants absolute decree power, overriding court majority votes and assembly policies. Gentry voters are now instinctively wary of any proposal that spends the village's funds, softening their earlier reflexive support for merchant/steward-favoring policies.
-* **Escalating Outsider Forces** — External threats trigger arrival events: **Knights** (`🛡`) arrive at the border to investigate after two non-exile deaths; **Inquisitors** (`⚖`) arrive to combat cults if a Priest confirms multiple cultist identities. Their arrivals and deaths are now chronicled as Story Narration moments.
+* **Escalating Outsider Forces** — External threats trigger arrival events: **Knights** (`🛡`) arrive at the border to investigate the cause of death after two non-exile deaths, following unresolved rumours and interviewing witnesses; **Inquisitors** (`⚖`) arrive to investigate cult activity if a Priest confirms multiple cultist identities. Both will confront an Entity on sight but can never destroy it. Their arrivals and deaths are now chronicled as Story Narration moments.
 * **Targeted Preaching** — A cult member's `preach` action now actively seeks out and approaches the nearest convertible villager rather than only sermonizing at the shrine, closing the gap before beginning the pitch.
 * **Belief-Consistent Sentencing** — A non-cultist resolution-court voter can no longer vote to punish an accusation they don't actually believe, and can only vote to execute (rather than exile) when they hold a firm, high-confidence belief in a genuinely grave claim.
 
 ### 📜 Story Narration
 * **Village Chronicle Moments** — Beyond cult foundings, corruptions, and blights, the chronicle now narrates a deity-placed relic's manifestation, a cult leader's unanimous election as Alderman (with the dramatic irony of a village unknowingly elevating a hidden cultist), a Knight or Inquisitor's arrival and death, the village's last unconverted soul disappearing (**The Village That Remains**), a cult leader left as the sole living survivor, and the extinction of every cult that ever rose in the village.
-* **Demon Manifestation Shock** — Successfully summoning a Demon now instantly saturates the entire map's corruption to maximum, rather than only spreading outward from the summoning site over time.
+* **Entity Manifestation Shock** — Successfully summoning an Entity now instantly saturates the entire map's corruption to maximum, rather than only spreading outward from the summoning site over time.
 
 ### 🖥️ Interface & Debugging
 * **Rumour & Belief Tracker** — A collapsible left-side HUD displaying active/archived claims, reach, source credibility, individual agent stances, and a live timeline of private thoughts.
-* **Visual Role Badges** — Agent overlays and lists display unique icons for Prophets (`✦`), Knights (`🛡`), Inquisitors (`⚖`), and Demons (`☠`).
+* **Visual Role Badges** — Agent overlays and lists display unique icons for Prophets (`✦`), Knights (`🛡`), Inquisitors (`⚖`), and Entities (`☠`).
 * **Detailed Agent Inspect Tool** — Full state inspector showcasing needs, personality, memory summaries, active behaviors, and relationship charts.
 * **Simulation controls** — Speed adjustment, pause/resume (Space), day/night lighting filter overlay, and F1 Debug console.
 * **Log export** — Expose and download all simulated events with causation chains as JSON/CSV.
@@ -145,7 +145,7 @@ ai-town/
 │   │       ├── SocialSystem.ts        # Encounters, conversation batching & context
 │   │       ├── OutsiderSystem.ts      # Knight/Inquisitor spawning & combat
 │   │       ├── StorySystem.ts         # Narrates major story moments
-│   │       ├── EnvironmentSystem.ts   # Localized tile corruption from cult/demon/ritual activity
+│   │       ├── EnvironmentSystem.ts   # Localized tile corruption from cult/entity/ritual activity
 │   │       ├── RelicSystem.ts         # Forbidden relic creation, discovery & deity relic placement
 │   │       ├── SchemeValidator.ts     # Validates LLM-proposed Cult Scheme output against job affordances
 │   │       └── SystemDeps.ts          # Shared dependency-injection interface between systems

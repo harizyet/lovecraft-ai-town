@@ -197,9 +197,19 @@ export class AgentManager {
       applyResurrectionInsanity: (target, sourceName, includeExecuteVoterInsanity) =>
         this.religionSystem.applyResurrectionInsanity(target, sourceName, includeExecuteVoterInsanity),
       getProphetAgentId: () => this.religionSystem.state.prophetAgentId,
+      getDemonSummonCredits: () => this.religionSystem.state.demonSummonCredits,
       grantDemonSummonCredit: (site) => {
-        this.religionSystem.state.demonSummonCredits++
-        this.religionSystem.state.demonSummonSites.push(site)
+        // Only one Entity can ever exist and it can never be destroyed, so the
+        // summon charge is a single irreversible, world-ending threshold -- it
+        // never stacks past one, and once the Entity has been created (even if
+        // it later dies), no further charge is granted.
+        if (
+          this.religionSystem.state.demonSummonCredits < 1 &&
+          !this.agents.some((agent) => agent.state.demon)
+        ) {
+          this.religionSystem.state.demonSummonCredits = 1
+          this.religionSystem.state.demonSummonSites = [site]
+        }
         return this.religionSystem.state.demonSummonCredits
       },
       maybeCreateForbiddenRelic: (agent, rumour, causationId) =>

@@ -101,18 +101,29 @@ the convening authority. The court event records which Priest called it. A
 vague claim that a cult exists remains an investigation matter because a court
 still requires a named accused villager.
 
-Outsiders may enter in response to escalating village conditions. Once two
-non-exile deaths exist, one Knight is generated at a walkable map edge, enters
-the town, and heads toward the guardhouse. After a Priest has successfully
-interrogated and privately confirmed at least two distinct cultists, the Priest
-may choose `call_inquisitor`. This creates one Inquisitor at the town edge and
-routes them toward the church. The Inquisitor receives the calling Priest's
-confirmed cult evidence and can continue cult investigations and
-interrogations. Each outsider arrival is logged and announced as an arrival;
-the one-time arrival flags and outsider identity persist in saved games. Each
-arrival now also fires its own Story Narration moment (`knight_called` /
-`inquisitor_called`), and an outsider's death in combat fires a matching
-`knight_killed` / `inquisitor_killed` moment.
+Outsiders may enter in response to escalating village conditions, and both are
+fundamentally investigators rather than monster hunters: a Knight is a
+criminal investigator following the cause of death, and an Inquisitor is a
+religious investigator following suspected cult activity. Once two non-exile
+deaths exist, one Knight is generated at a walkable map edge, enters the town,
+and heads toward the guardhouse. After a Priest has successfully interrogated
+and privately confirmed at least two distinct cultists, the Priest may choose
+`call_inquisitor`. This creates one Inquisitor at the town edge and routes them
+toward the church. The Inquisitor receives the calling Priest's confirmed cult
+evidence and can continue cult investigations and interrogations. Each
+outsider arrival is logged and announced as an arrival; the one-time arrival
+flags and outsider identity persist in saved games. Each arrival now also
+fires its own Story Narration moment (`knight_called` / `inquisitor_called`),
+and an outsider's death in combat fires a matching `knight_killed` /
+`inquisitor_killed` moment.
+
+A Knight has standing investigative authority over any unresolved rumour whose
+text concerns death (killing, murder, a corpse, blood, an attack) the same way
+a Priest or Inquisitor has authority over cult-flavored rumours: with no open
+lead, a Knight patrols town buildings for anomalies; once such a rumour
+exists, the Knight instead interviews witnesses and reaches a verified or
+unsubstantiated finding through the same investigation pipeline ordinary
+villagers use, rather than patrolling aimlessly.
 
 Cultists detect nearby priests and replace preaching, recruitment, prayer,
 interrogation, and visible rites with an innocuous activity. The completion
@@ -146,9 +157,9 @@ within one tile of the site center. These fixed destinations replace stale
 leader-chasing paths and are recalculated whenever the ritual site changes.
 Completion waits until the leader and both participants are within two tiles of the chosen
 location; if fewer than three valid members remain, the attempt fails and logs
-the member count. Each successful rite grants the user one Demon summon charge
-and records that chosen location as the Demon's future spawn point. Creating a
-Demon consumes one charge and requires a non-empty user command. The Demon
+the member count. Each successful rite grants the user one Entity summon charge
+and records that chosen location as the Entity's future spawn point. Creating an
+Entity consumes one charge and requires a non-empty user command. The Entity
 controls show a live travel-progress bar, the leader and cult name, the chosen
 site, and how many of the three required participants have gathered.
 
@@ -162,27 +173,31 @@ An accepted divine whisper that explicitly commands summoning becomes an
 executable prophetic `summon` task for a cult leader. The interpretation must
 choose a real building; an invalid or omitted location falls back to the church
 and then another known building. Older saves whose accepted summon whisper
-produced only thoughts are reopened when no summon task, charge, or Demon exists.
+produced only thoughts are reopened when no summon task, charge, or Entity exists.
 
-Demons receive no autonomous schedules, fallback work, idle recovery,
+Entities receive no autonomous schedules, fallback work, idle recovery,
 conversations, or LLM decisions: they remain inert except while
-executing user commands. Commands can direct a Demon toward a named villager or
+executing user commands. Commands can direct an Entity toward a named villager or
 location, or order it to pursue and attack a named living villager.
 
-Demons have 666 health and ignore all damage—including instant-kill rolls,
-divine smiting, court execution, and ordinary attacks—unless the attacker is a
-persisted Knight or Inquisitor outsider. Blocked attacks are logged with zero
-damage and an invulnerability outcome. Demon charges, created Demons, their
-last commands, and ongoing commanded movement persist in saved games.
+In keeping with the setting's Lovecraftian lore, a bound Entity cannot be
+destroyed by combat at all: it ignores every form of damage—instant-kill
+rolls, divine smiting, court execution, and ordinary attacks—regardless of who
+lands the blow, Knight and Inquisitor included. Blocked attacks are logged
+with zero damage and an invulnerability outcome. A Knight or Inquisitor may
+still engage an Entity on sight and will keep attacking it indefinitely, but the
+fight can never end in the Entity's death; only the summoning cult member's own
+commands govern what an Entity does. Entity charges, created Entities, their last
+commands, and ongoing commanded movement persist in saved games.
 
-The instant a Demon is successfully summoned, the entire map's environmental
+The instant an Entity is successfully summoned, the entire map's environmental
 corruption is slammed to maximum (1.0) rather than only spreading outward
 from the summoning site over time — the manifestation's shock reads as
-total and immediate. Tiles outside the Demon's own radius of influence still
+total and immediate. Tiles outside the Entity's own radius of influence still
 decay back down afterward through the ordinary corruption mechanics once
 nothing else sustains them there.
 
-Living agents within eight tiles see the Demon manifest. Witnesses who belong
+Living agents within eight tiles see the Entity manifest. Witnesses who belong
 to any cult are immune to the manifestation's existential reaction. Every
 other witness's schedule and current activity are interrupted immediately and
 resolves through the same comprehension/reaction system described below.
@@ -194,7 +209,7 @@ resurrection, route through that same system rather than a flat coin flip.
 
 The world itself is not immune to the village's spiritual corruption. Three
 sources bleed a localized corruption value into nearby tiles: a cult's shrine
-(scaled by how many living members it has), a bound Demon (moving with it, and
+(scaled by how many living members it has), a bound Entity (moving with it, and
 by far the strongest source), and the site of an active summoning ritual while
 it is underway. A corrupted Priest's congregation counts here too even though
 it never raises a separate shrine building (see "A corrupted Priest" above):
@@ -204,7 +219,7 @@ spreads with distance falloff from each source,
 ramping up gradually over real simulated minutes rather than appearing
 instantly, and it is capped by the strength of whatever is causing it — a
 small, thinly attended shrine only ever taints its immediate surroundings,
-while a Demon's presence can blight a much wider area.
+while an Entity's presence can blight a much wider area.
 
 Crossing a visible threshold has two distinct, tile-type-specific consequences,
 each narrated only the first time it happens to a given tile:
@@ -219,15 +234,15 @@ overall effect reads as spreading ambient dread rather than a wall of
 repeated announcements. Any living villager near a tile when it first crosses
 the visible threshold witnesses it and receives the memory. The very first
 time any tile is corrupted in a given village, the moment is chronicled through
-the same Story Narration system used for cult foundings and demonic summons.
+the same Story Narration system used for cult foundings and entity summons.
 
 Corruption is reversible: it only continues to grow within an active source's
 radius, and decays back toward zero once nothing sustains it there — a
-disbanded cult's shrine losing its congregation, or a Demon moving elsewhere
+disbanded cult's shrine losing its congregation, or an Entity moving elsewhere
 or being removed, lets the tainted ground gradually heal. This is distinct
 from the global weather system (clear/cloudy/rain/storm), which is ambient and
 untied to any in-world cause; corruption is always the localized, visible
-fingerprint of a specific cult, Demon, or ritual.
+fingerprint of a specific cult, Entity, or ritual.
 
 ### Eldritch Blight
 
@@ -238,13 +253,13 @@ for a sustained stretch of simulated time (continuously, not merely having
 once peaked there) — a grass tile permanently becomes anomalous, blighted
 ground, and a water tile permanently becomes brackish water. Neither ever
 reverts to ordinary grass or clear water again, even long after the shrine,
-Demon, or ritual responsible is gone and the tile's own transient corruption
-has fully faded back to nothing. A demon's presence or an active summoning
+Entity, or ritual responsible is gone and the tile's own transient corruption
+has fully faded back to nothing. A entity's presence or an active summoning
 site cross the sustained threshold quickly; a lone, sparsely attended shrine
 never generates enough intensity on its own to blight anything, while a
 large, well-established one eventually can. The very first blight conversion
 in a village's history is chronicled through the Story Narration system, the
-same way a cult's founding or a Demon's summoning is; every individual
+same way a cult's founding or an Entity's summoning is; every individual
 conversion afterward is still recorded as an ordinary witnessed event, just
 without its own narrated moment. Blighted ground no longer yields herbs to
 `gather` the way ordinary grass does — one of the ways the change is a
@@ -260,7 +275,7 @@ resolves as a binary insane/not-insane roll. It resolves in two stages:
 1. **Classification** (whispered text only): an LLM judges whether the text
    is actually forbidden knowledge in this Lovecraftian sense, and how
    directly it states it (severity 0-100). A vague hint (severity below 50)
-   unsettles but does nothing further. A witnessed anomaly (a demon
+   unsettles but does nothing further. A witnessed anomaly (an entity
    manifesting, a targeted divine manifestation, a resurrection, or -- for an
    already-obsessed villager -- even a deity-commanded weather change) skips
    straight to stage 2, since these are forbidden by construction.
@@ -404,7 +419,7 @@ Cult members act as a coordinated voting bloc in resolution court. When the livi
 
 Cults are non-aggressive toward outsiders by default and have no fixed hostility assigned at founding. Their collective temperament emerges from the average aggression of their living membership. A cult with at least two members and average aggression of 65% or higher periodically has a bounded chance to form a mob; at least two members with 45% aggression must participate. The mob may select a living nonbeliever or atheist outside the cult, pursue them together, and attack on arrival. Mob formation, membership, target, group aggression, and causation are recorded, and each cult has a six-simulated-hour cooldown between mobs.
 
-Cult membership unlocks cult-specific tasks: `pray`, `conjure`, `resurrect`, `heal`, `bless`, `curse`, `ritual`, and `preach`; `summon` and `build_shrine` are reserved for the cult leader. Personality, doctrine, faith, memories, and circumstances determine whether these appear in an LLM decision or daily schedule. Non-members cannot execute them; invalid non-member rites are replaced by ordinary work. Prayer and ritual strengthen faith, healing restores health, blessing improves confidence and reputation, curses frighten and reduce reputation, preaching improves the speaker's standing, and resurrection can restore a specifically named dead villager with partial health and forces that villager to reevaluate their life. A leader's summoning names a building, gathers two fellow members there, and waits for all three participants before producing a Demon charge tied to that location. Conjuring creates a witnessed manifestation event. Direct supernatural effects therefore enter the simulation only as consequences of cult actions rather than arbitrary actions by ordinary villagers.
+Cult membership unlocks cult-specific tasks: `pray`, `conjure`, `resurrect`, `heal`, `bless`, `curse`, `ritual`, and `preach`; `summon` and `build_shrine` are reserved for the cult leader. Personality, doctrine, faith, memories, and circumstances determine whether these appear in an LLM decision or daily schedule. Non-members cannot execute them; invalid non-member rites are replaced by ordinary work. Prayer and ritual strengthen faith, healing restores health, blessing improves confidence and reputation, curses frighten and reduce reputation, preaching improves the speaker's standing, and resurrection can restore a specifically named dead villager with partial health and forces that villager to reevaluate their life. A leader's summoning names a building, gathers two fellow members there, and waits for all three participants before producing an Entity charge tied to that location. Conjuring creates a witnessed manifestation event. Direct supernatural effects therefore enter the simulation only as consequences of cult actions rather than arbitrary actions by ordinary villagers.
 
 Preaching now actively seeks converts rather than only sermonizing from the shrine: a preaching cult member first looks for the nearest living, convertible, non-immune villager, and if one exists beyond speaking range, travels toward them before beginning the sermon. With no eligible convert nearby, preaching falls back to gathering at the shrine as before.
 
@@ -535,7 +550,7 @@ This consistency check now also applies uniformly after any non-cultist voter's 
 ## Social interfaces
 
 - **Rumour & Belief Tracker**: shows claims, origins, credibility, reach, related branches, objective whisper truth controls, agent judgments, individual belief badges, and private thought events.
-- **Role markers**: Agent States rows and the complete agent-details popup mark Prophets with `✦`, Knight outsiders with `🛡`, Inquisitor outsiders with `⚖`, and user-commanded Demons with `☠`; details expand each icon into a labeled badge.
+- **Role markers**: Agent States rows and the complete agent-details popup mark Prophets with `✦`, Knight outsiders with `🛡`, Inquisitor outsiders with `⚖`, and user-commanded Entities with `☠`; details expand each icon into a labeled badge.
 - **Court Readiness**: groups cases by accused, shows full-village reach, related statuses, and every living villager's stance for each claim. Belief is informational rather than a readiness gate.
 - **Resolution Court panel**: shows the accused, grouped accusations, defense, statements, votes, progress, and final verdict.
 - **Debug agent panel**: shows current activity, LLM request state, needs, emotion, reputation, relationships, memory, and other internal state.
@@ -729,7 +744,7 @@ Dream is the quietest invocation-gated Deity ability, distinct from the overt Bl
 
 Whether the planted content lands as an ordinary dream or curdles into a nightmare is a roll weighted against the target's current sanity: the frailer their sanity already is, the likelier it turns into a nightmare. A nightmare additionally drains 5-15 more sanity on the spot and sets the target's emotional state to afraid; an ordinary dream leaves sanity untouched. Either way the content is recorded as a private memory, colors the target's own internal reasoning the next time they act, and is surfaced explicitly to the conversation system — a dreaming villager is nudged to bring the dream up unprompted with whoever they next talk to, discussing it more insistently and fearfully if it turned into a nightmare.
 
-Independent of any player action, cult-unaligned villagers can also have a nightmare arise on their own the instant they fall asleep. The odds scale with a 0-1 "town corruption level" — a blend of the ambient environmental corruption tracked by `EnvironmentSystem` (ambient tile corruption from nearby shrines, demons, and summoning rites) and the fraction of the living population that currently belongs to a cult — combined with the same sanity weighting used for planted nightmares, capped at a 15% chance per sleep. A spontaneous nightmare draws from a small pool of Lovecraftian flavor lines (something vast stirring underground, neighbors' faces going wrong, a voice chanting words that hurt to remember, and similar), drains a smaller 3-10 sanity, and is otherwise indistinguishable from a player-planted one once it lands — same fear response, same private memory, same pressure to surface it in the next conversation. In effect, the more corrupted and cult-ridden the town becomes, the more its ordinary, unaffiliated residents start losing sleep over things they can't explain.
+Independent of any player action, cult-unaligned villagers can also have a nightmare arise on their own the instant they fall asleep. The odds scale with a 0-1 "town corruption level" — a blend of the ambient environmental corruption tracked by `EnvironmentSystem` (ambient tile corruption from nearby shrines, entities, and summoning rites) and the fraction of the living population that currently belongs to a cult — combined with the same sanity weighting used for planted nightmares, capped at a 15% chance per sleep. A spontaneous nightmare draws from a small pool of Lovecraftian flavor lines (something vast stirring underground, neighbors' faces going wrong, a voice chanting words that hurt to remember, and similar), drains a smaller 3-10 sanity, and is otherwise indistinguishable from a player-planted one once it lands — same fear response, same private memory, same pressure to surface it in the next conversation. In effect, the more corrupted and cult-ridden the town becomes, the more its ordinary, unaffiliated residents start losing sleep over things they can't explain.
 
 Either kind of dream is temporary: it persists through the villager's following waking hours (and is visible in the Agent States detail popup, tagged by source — "player" or "spontaneous") but is cleared automatically the next time that villager falls asleep again, whether or not a new one replaces it.
 
@@ -745,7 +760,7 @@ Forbidden Relics can be generated in two ways:
 
 1. **Organic Investigation Writing (16% Chance)**:
    - When a vocation-based investigation concludes (whether verified or unsubstantiated), the investigator has a flat 16% chance (`RELIC_CREATION_CHANCE`) to pen their findings into a physical relic.
-   - A separate roll decides if the relic's text contains forbidden knowledge. The base chance is 35%, which increases by 30% if the author already carries forbidden knowledge, and by 15% if the rumour text is cult-related (referencing cults, rituals, heretics, demons, deities, etc.), capped at 85%.
+   - A separate roll decides if the relic's text contains forbidden knowledge. The base chance is 35%, which increases by 30% if the author already carries forbidden knowledge, and by 15% if the rumour text is cult-related (referencing cults, rituals, heretics, entities, deities, etc.), capped at 85%.
    - If it contains forbidden knowledge, the author immediately faces an existential-witness sanity check (risk of nihilism, obsession, or permanent insanity).
    - If the author belongs to a cult, the relic is tagged with their cult's ID, cult name, and deity.
 

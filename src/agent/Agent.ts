@@ -524,10 +524,8 @@ export class Agent {
   public takeDamage(amount: number, attackerId: string): boolean {
     if (!this.state.alive) return false
     if (this.state.demon) {
-      const attacker = this.simManager.getAgent(attackerId)
-      if (!attacker?.outsider || !['knight', 'inquisitor'].includes(attacker.outsider.kind)) {
-        return false
-      }
+      // Lovecraftian lore: a bound demon cannot be slain by mortal combat, no matter who strikes it.
+      return false
     }
 
     this.state.health -= amount
