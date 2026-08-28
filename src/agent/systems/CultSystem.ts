@@ -2411,7 +2411,7 @@ export class CultSystem {
         agent.state.activeCultScheme = scheme
         this.state.lastCultSchemeProposalDay[agent.state.id] = proposalDay
 
-        this.deps.eventBus.emit({
+        const proposedEvent = this.deps.eventBus.emit({
           type: 'cult_scheme_proposed',
           agentId: agent.state.id,
           actionType: ActionType.CORRUPT,
@@ -2421,6 +2421,7 @@ export class CultSystem {
           worldStateDelta: { schemeId: scheme.id, primitive: scheme.primitive, risk: scheme.risk, proposalSource: source },
           observers: [agent.state.id],
         })
+        this.beginCultSchemePreparation(agent, scheme, proposedEvent.id)
       })()
 
       this.deps.setLLMRequestInFlight(true)
@@ -2435,13 +2436,137 @@ export class CultSystem {
     }
   }
 
+  // Flat prep duration for Phase 3 -- per-job/per-risk tuning is a
+  // nice-to-have, not required yet.
+  private static readonly SCHEME_PREP_DURATION_MINUTES = 30
+  // Radius within which a nearby authority figure can notice a preparing
+  // scheme -- matches Agent.proximityRadius (the same radius hasNearbyPriest
+  // implicitly uses via getNearbyAgents).
+  private static readonly SCHEME_WITNESS_JOBS = ['Priest', 'Town Guard', 'Inquisitor']
+
+  // Begins the leader's travel-then-prepare occupation for a just-proposed
+  // scheme: seeds a synthetic activeBlocks entry (bypassing startBlock --
+  // its 'work' case would call executeLLMDecision synchronously and fire
+  // ordinary work side-effects at the leader's CURRENT position, before
+  // they've traveled anywhere) and starts them moving toward their job
+  // building, mirroring how gatherCultForSummoning manipulates a leader's
+  // block in place rather than going through startBlock again.
+  private beginCultSchemePreparation(leader: Agent, scheme: CultScheme, eventId: string): void {
+    const building = scheme.targetBuildingType
+      ? this.deps.findBuildingOfType(leader, scheme.targetBuildingType)
+      : null
+    if (scheme.primitive === 'relic_exposure' && !building) {
+      // No workshop of the right type nearby -- no cover to prepare at.
+      scheme.status = 'rejected'
+      this.finishScheme(leader, scheme)
+      return
+    }
+
+    this.deps.activeBlocks.set(leader.state.id, {
+      action: {
+        action: 'work',
+        target: building?.name ?? null,
+        durationMinutes: CultSystem.SCHEME_PREP_DURATION_MINUTES,
+        reasoning: 'Quietly attending to trade business',
+        dialogue: '',
+        emotionalState: 'neutral',
+      },
+      endsAt: this.deps.getAbsoluteMinute() + CultSystem.SCHEME_PREP_DURATION_MINUTES,
+      eventId,
+      schemeId: scheme.id,
+    })
+    this.deps.decisionQueue.set(leader.state.id, [])
+
+    if (building) {
+      leader.moveTo(building.position.x + building.size.x / 2, building.position.y + building.size.y / 2)
+      scheme.status = 'traveling'
+    } else {
+      scheme.status = 'preparing'
+      scheme.preparingUntilMinute = this.deps.getAbsoluteMinute() + CultSystem.SCHEME_PREP_DURATION_MINUTES
+    }
+  }
+
   public advanceCultSchemes(): void {
     for (const agent of this.deps.getAgents()) {
       const scheme = agent.state.activeCultScheme
-      if (!scheme || scheme.status !== 'proposed') continue
-      scheme.status = 'active'
-      this.executeCultScheme(agent, scheme)
+      if (!scheme) continue
+
+      if (scheme.status === 'traveling' || scheme.status === 'preparing') {
+        const block = this.deps.activeBlocks.get(agent.state.id)
+        if (!agent.state.alive || !block || block.schemeId !== scheme.id) {
+          scheme.status = 'rejected'
+          this.finishScheme(agent, scheme)
+          continue
+        }
+        // Keep this block from ever looking "due" to ScheduleSystem's own
+        // completion check while CultSystem is still managing it -- the
+        // same re-poll idiom advanceSummoningProcess uses.
+        block.endsAt = this.deps.getAbsoluteMinute() + 5
+      }
+
+      if (scheme.status === 'traveling') {
+        const building = scheme.targetBuildingType ? this.deps.findBuildingOfType(agent, scheme.targetBuildingType) : null
+        if (!building) {
+          scheme.status = 'rejected'
+          this.finishScheme(agent, scheme)
+          continue
+        }
+        const cx = building.position.x + building.size.x / 2
+        const cy = building.position.y + building.size.y / 2
+        if (Math.hypot(agent.state.position.x - cx, agent.state.position.y - cy) <= 2) {
+          scheme.status = 'preparing'
+          scheme.preparingUntilMinute = this.deps.getAbsoluteMinute() + CultSystem.SCHEME_PREP_DURATION_MINUTES
+        } else if (agent.state.path.length === 0) {
+          agent.moveTo(cx, cy)
+        }
+        continue
+      }
+
+      if (scheme.status === 'preparing') {
+        this.maybeWitnessSchemePreparation(agent, scheme)
+        if (this.deps.getAbsoluteMinute() >= scheme.preparingUntilMinute!) {
+          this.executeCultScheme(agent, scheme)
+        }
+      }
     }
+  }
+
+  // Genuinely new mechanic (no existing "caught mid-activity" precedent in
+  // this codebase): while a scheme is preparing, a nearby authority figure
+  // has a small chance to notice something amiss and seed an ordinary,
+  // cult-flavored rumour naming the leader -- feeding the existing
+  // investigation/court pipeline rather than a bespoke consequence. The
+  // scheme itself is not slowed or aborted by being witnessed.
+  private maybeWitnessSchemePreparation(leader: Agent, scheme: CultScheme): void {
+    if (scheme.witnessed) return
+    const witnesses = leader.getNearbyAgents(this.deps.getAgents()).filter(
+      (a) => CultSystem.SCHEME_WITNESS_JOBS.includes(a.state.currentJob ?? '') && a.state.cult?.id !== scheme.cultId
+    )
+    if (witnesses.length === 0) return
+    const witness = witnesses[0]
+
+    const chance = Math.max(0.02, 0.08 + witness.state.personality.curiosity * 0.1 - leader.state.personality.caution * 0.1)
+    if (Math.random() >= chance) return
+
+    scheme.witnessed = true
+    const buildingName = this.deps.activeBlocks.get(leader.state.id)?.action.target ?? 'their workplace'
+    const text = `${witness.state.name} noticed ${leader.state.name} behaving strangely near ${buildingName}, quickly hiding something before it could be seen clearly.`
+    const event = this.deps.eventBus.emit({
+      type: 'cult_scheme_witnessed',
+      agentId: witness.state.id,
+      actionType: ActionType.CORRUPT,
+      outcome: 'suspicious',
+      description: text,
+      causationIds: [],
+      worldStateDelta: { schemeId: scheme.id, leaderId: leader.state.id },
+      observers: [witness.state.id],
+    })
+    witness.addRecentMemory(event)
+    const rumour = this.deps.createRumour(text, 'natural', witness.state.id, event.id, 0.4, undefined, {
+      kind: 'event',
+      description: 'A witnessed moment of suspicious behavior',
+    })
+    this.deps.registerAgentCreatedRumour(rumour, witness, 'invented')
   }
 
   private computeSchemeIntensity(leader: Agent, scheme: CultScheme): number {
@@ -2498,6 +2623,8 @@ export class CultSystem {
   }
 
   private finishScheme(leader: Agent, scheme: CultScheme): void {
+    const block = this.deps.activeBlocks.get(leader.state.id)
+    if (block?.schemeId === scheme.id) this.deps.activeBlocks.delete(leader.state.id)
     leader.state.cultSchemeHistory = [...(leader.state.cultSchemeHistory ?? []), scheme].slice(-5)
     leader.state.activeCultScheme = undefined
   }

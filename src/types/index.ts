@@ -157,7 +157,10 @@ export function isJob(value: string | undefined): value is Job {
 // what their vocation affords (JOB_AFFORDANCES). The LLM never sets potency
 // directly.
 export type CultSchemePrimitive = 'relic_exposure' | 'conversion_influence'
-export type CultSchemeStatus = 'proposed' | 'active' | 'resolved' | 'rejected'
+// 'traveling': leader is pathing toward their job building. 'preparing':
+// arrived (or no building needed) and holding until preparingUntilMinute,
+// during which a nearby authority figure may witness the act (Phase 3).
+export type CultSchemeStatus = 'proposed' | 'traveling' | 'preparing' | 'resolved' | 'rejected'
 export type CultSchemeRisk = 'subtle' | 'moderate' | 'bold'
 
 export const CULT_SCHEME_PRIMITIVES: CultSchemePrimitive[] = ['relic_exposure', 'conversion_influence']
@@ -192,6 +195,13 @@ export interface CultScheme {
   // Provenance -- lets dev/tuning tell whether the local model is actually
   // producing valid job-specific schemes or silently falling back.
   proposalSource: 'llm' | 'llm_retry' | 'fallback'
+  // The absolute-minute deadline at which executeCultScheme actually fires,
+  // once status reaches 'preparing'. Set by beginCultSchemePreparation.
+  preparingUntilMinute?: number
+  // Set true the first time a nearby authority figure notices the leader
+  // during 'preparing' and a rumour is seeded -- gates one rumour per
+  // scheme, not one per tick.
+  witnessed?: boolean
 }
 
 export enum ActionType {

@@ -48,6 +48,11 @@ export type ActiveBlockEntry = {
   summonInitialDistances?: Record<string, number>
   summonInvitedMemberIds?: string[]
   summonPhase?: 'recruiting' | 'travelling'
+  // Set when this block is a Cult Scheme's synthetic travel/prep occupation
+  // (see CultSystem.beginCultSchemePreparation) -- lets advanceCultSchemes
+  // tell, on a later tick, whether this is still that scheme's own block or
+  // has been overwritten/cleared by something higher priority.
+  schemeId?: string
 }
 
 // Narrow surface of StorySystem exposed to other extracted subsystems, so
