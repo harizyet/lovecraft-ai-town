@@ -2,6 +2,7 @@ import { TileType, BuildingType, SimulationConfig, DayNightCycle, AgentState, Em
 import { World } from '@/world/World'
 import { Camera } from '@/rendering/Camera'
 import { getJobIcon } from '@/utils/JobIcons'
+import { WeatherEffects } from '@/rendering/WeatherEffects'
 
 interface RendererSimulationState {
   paused: boolean
@@ -29,6 +30,7 @@ export class Renderer {
   private selectedAgentId: string | undefined
 
   private emotionIcons: Record<EmotionalState, string>
+  private weatherEffects: WeatherEffects
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -91,6 +93,12 @@ export class Renderer {
       [EmotionalState.DETERMINED]: '',
     }
 
+    this.weatherEffects = new WeatherEffects(
+      canvas,
+      world.width * this.tileSize,
+      world.height * this.tileSize
+    )
+
     this.resize()
     window.addEventListener('resize', () => this.resize())
   }
@@ -137,9 +145,12 @@ export class Renderer {
     }
     this.renderDeadBodies(agents)
     this.renderAgents(agents, simulation.rumourImpactCounts)
+    this.weatherEffects.update(weather.condition)
+    this.weatherEffects.renderClouds(this.ctx)
     this.ctx.restore()
 
     this.renderDayNightOverlay(dayNight)
+    this.weatherEffects.renderPrecipitation(this.ctx, weather.condition)
     this.renderHUD(agents, dayNight, weather, simulation)
   }
 
